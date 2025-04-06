@@ -1,29 +1,35 @@
 # CloudSync
 
-**CloudSync** is a Dart library that provides a flexible and extensible mechanism for synchronizing files between local and cloud storage. It's designed with composability in mind, using high-level abstractions and callback-driven progress reporting.
+**CloudSync** is a Dart package that provides a flexible and type-safe mechanism to synchronize data between **local** and **cloud** storage. Designed with composability and progress observability in mind, this utility uses metadata comparison to detect changes and synchronize them efficiently.
 
 ---
 
-## ✨ Features
+## Features
 
-- 🔄 Bi-directional sync (local ↔️ cloud)
-- 🧠 Smart comparison via file metadata
-- 📦 Progress callback system
-- 💥 Error reporting and state tracking
-- 🔧 Fully customizable I/O using function injection
-- ⏱ Auto-sync with periodic synchronization
+- Two-way sync between local and cloud
+- Smart diffing using metadata timestamps
+- Progress tracking with callback-based state reporting
+- Modular architecture with function injection for I/O
+- Automatic periodic syncing
+- Error handling with detailed sync state events
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Install
 
-Add `cloud_sync` to your Dart or Flutter project:
+Add `cloud_sync` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  cloud_sync:
+  cloud_sync: ^<latest_version>
+```
+
+Then run:
+
+```bash
+flutter pub get
 ```
 
 ### 2. Import
@@ -34,147 +40,173 @@ import 'package:cloud_sync/cloud_sync.dart';
 
 ---
 
-## 🛠 Usage Example
+## Usage Example
 
 ```dart
-final cloudSync = CloudSync(
+final cloudSync = CloudSync<MyMetadata, MyData>(
   fetchLocalMetadataList: () async => localMetadataList,
   fetchCloudMetadataList: () async => cloudMetadataList,
-  fetchLocalFileByMetadata: (metadata) async => localStorage[metadata.id]!,
-  fetchCloudFileByMetadata: (metadata) async => cloudStorage[metadata.id]!,
-  writeFileToLocalStorage: (metadata, file) async => localStorage[metadata.id] = file,
-  writeFileToCloudStorage: (metadata, file) async => cloudStorage[metadata.id] = file,
+  fetchLocalDetail: (metadata) async => localStorage[metadata.id]!,
+  fetchCloudDetail: (metadata) async => cloudStorage[metadata.id]!,
+  writeDetailToLocal: (metadata, data) async => localStorage[metadata.id] = data,
+  writeDetailToCloud: (metadata, data) async => cloudStorage[metadata.id] = data,
 );
 
-// Synchronize files
+// Manual sync
 await cloudSync.sync(progressCallback: (state) {
-  print('Progress: ${state.runtimeType}');
+  print('Sync state: \${state.runtimeType}');
 });
 
-// Start auto-sync every 5 minutes
-cloudSync.autoSync(interval: Duration(minutes: 5), progressCallback: (state) {
-  print('Auto-sync progress: ${state.runtimeType}');
-});
+// Start auto-sync every 10 minutes
+cloudSync.autoSync(
+  interval: Duration(minutes: 10),
+  progressCallback: (state) {
+    print('Auto-sync state: \${state.runtimeType}');
+  },
+);
 
-// Stop auto-sync when needed
+// Stop auto-sync
 cloudSync.stopAutoSync();
 ```
 
 ---
 
-## 🧩 API Overview
+## API Overview
 
-### `CloudSync` constructor
+### `CloudSync<M, D>` Constructor
 
 ```dart
 CloudSync({
-  required FetchMetadataList fetchLocalMetadataList,
-  required FetchMetadataList fetchCloudMetadataList,
-  required FetchFileByMetadata fetchLocalFileByMetadata,
-  required FetchFileByMetadata fetchCloudFileByMetadata,
-  required WriteFileToStorage writeFileToLocalStorage,
-  required WriteFileToStorage writeFileToCloudStorage,
+  required FetchMetadataList<M> fetchLocalMetadataList,
+  required FetchMetadataList<M> fetchCloudMetadataList,
+  required FetchDetail<M, D> fetchLocalDetail,
+  required FetchDetail<M, D> fetchCloudDetail,
+  required WriteDetail<M, D> writeDetailToLocal,
+  required WriteDetail<M, D> writeDetailToCloud,
 });
 ```
 
-### Type Definitions
+### Methods
 
-| Type | Description |
-|------|-------------|
-| `FetchMetadataList` | `Future<List<SyncMetadata>> Function()` |
-| `FetchFileByMetadata` | `Future<SyncFile> Function(SyncMetadata)` |
-| `WriteFileToStorage` | `Future<void> Function(SyncMetadata, SyncFile)` |
-| `SyncProgressCallback` | `void Function(SyncState)` |
+| Method            | Description |
+|-------------------|-------------|
+| `sync()`          | Executes a full sync. |
+| `autoSync()`      | Starts a timer to auto-sync periodically. |
+| `stopAutoSync()`  | Stops the auto-sync process. |
 
 ---
 
-## 📦 Models
+## Type Definitions
+
+| Type | Signature | Purpose |
+|------|-----------|---------|
+| `FetchMetadataList<M>` | `Future<List<M>> Function()` | Fetches list of metadata |
+| `FetchDetail<M, D>` | `Future<D> Function(M)` | Retrieves data using metadata |
+| `WriteDetail<M, D>` | `Future<void> Function(M, D)` | Writes data to storage |
+| `SyncProgressCallback` | `void Function(SyncState)` | Reports progress updates |
+
+---
+
+## Models
 
 ### `SyncMetadata`
-
-Represents a file with fields:
 
 ```dart
 class SyncMetadata {
   final String id;
-  final String name;
-  final DateTime createdAt;
   final DateTime modifiedAt;
+
+  SyncMetadata({
+    required this.id,
+    required this.modifiedAt,
+  });
 }
 ```
 
-### `SyncFile`
+Extend this class to include more fields (e.g., `name`, `size`, etc.) as needed.
 
-Represents file contents:
+---
+
+## Sync Lifecycle States
+
+`SyncState` is the base class for all sync progress reporting. Use it to show progress in UI or for logging.
+
+| State | Description |
+|-------|-------------|
+| `AlreadyInProgress` | A sync is already ongoing and cannot start a new one. |
+| `FetchingLocalMetadata` | Fetching metadata from the local source. |
+| `FetchingCloudMetadata` | Fetching metadata from the cloud source. |
+| `CheckingCloudForMissingOrOutdatedData` | Comparing local data against cloud data to find differences. |
+| `CheckingLocalForMissingOrOutdatedData` | Comparing cloud data against local data to find differences. |
+| `WritingDetailToCloud` | Writing a specific data/metadata pair to the cloud. |
+| `WritingDetailToLocal` | Writing a specific data/metadata pair to local storage. |
+| `SynchronizationCompleted` | Sync finished without errors. |
+| `SynchronizationError` | Sync failed with an error. |
+
+Each state can be used for monitoring or UI updates.
+
+---
+
+## Auto-Sync
+
+Automatically sync data at regular intervals.
+
+### Start
 
 ```dart
-class SyncFile {
-  final List<int> bytes;
+cloudSync.autoSync(
+  interval: Duration(minutes: 15),
+  progressCallback: (state) {
+    print('Auto-sync: \${state.runtimeType}');
+  },
+);
+```
+
+### Stop
+
+```dart
+cloudSync.stopAutoSync();
+```
+
+> If a sync is already running when the timer fires, the cycle will be skipped and `AlreadyInProgress` will be reported.
+
+---
+
+## Example Custom Types
+
+You can define your own metadata and data models like this:
+
+```dart
+class MyMetadata extends SyncMetadata {
+  final String name;
+  MyMetadata({required super.id, required super.modifiedAt, required this.name});
+}
+
+class MyData {
+  final String content;
+  MyData(this.content);
 }
 ```
 
 ---
 
-## 🔄 Sync Lifecycle States (`SyncState`)
+## License
 
-- `AlreadyInProgress`
-- `FetchingLocalMetadata`
-- `FetchingCloudMetadata`
-- `CheckingCloudForMissingOrOutdatedFiles`
-- `CheckingLocalForMissingOrOutdatedFiles`
-- `SavingFileToCloud`
-- `SavingFileToLocal`
-- `SynchronizationCompleted`
-- `SynchronizationError`
+MIT License. Use it, extend it, and contribute!
 
 ---
 
-## 🕹 Auto-Sync
+## Inspiration
 
-`CloudSync` provides an auto-sync feature to periodically synchronize local and cloud storage. The auto-sync process triggers synchronization at a specified interval.
+Built for apps that need to keep data synchronized across devices or sessions, such as:
 
-### Methods
-
-#### `autoSync`
-
-Starts the auto-sync process with a specified `interval`. The sync will be triggered periodically based on the interval. An optional `progressCallback` can be provided to report synchronization progress.
-
-```dart
-void autoSync({
-  required Duration interval,
-  SyncProgressCallback? progressCallback,
-});
-```
-
-**Parameters:**
-
-- `interval`: The duration between each sync trigger (how often to perform synchronization).
-- `progressCallback`: An optional callback that will report the sync process progress.
-
-**Note:** If a sync is already in progress when the timer fires, that sync attempt will be skipped and not retried immediately. The `AlreadyInProgress` state will be passed to the `progressCallback` if provided.
-
-#### `stopAutoSync`
-
-Stops the auto-sync process by canceling the periodic timer.
-
-```dart
-void stopAutoSync();
-```
+- Note apps
+- Document managers
+- Media libraries
+- Offline-capable business tools
 
 ---
 
-## 🔒 License
+## Contributions Welcome
 
-MIT License. Use freely, contribute happily.
-
----
-
-## 💡 Inspiration
-
-Built for syncing stateful resources (like notes, images, or configs) across devices or between user sessions.
-
----
-
-## 👥 Contributions
-
-Pull requests, bug reports, and improvements are always welcome!
+Found a bug or have a suggestion? PRs and issues are open and appreciated!
