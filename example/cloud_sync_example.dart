@@ -2,8 +2,8 @@ import 'package:cloud_sync/cloud_sync.dart';
 
 void main() async {
   // Mock metadata and file storage
-  final localStorage = <String, SyncFile>{};
-  final cloudStorage = <String, SyncFile>{};
+  final localStorage = <String, Object>{};
+  final cloudStorage = <String, Object>{};
 
   final localMetadata = <SyncMetadata>[
     SyncMetadata(
@@ -24,22 +24,22 @@ void main() async {
   ];
 
   // Add file content to local and cloud storages
-  localStorage['1'] = SyncFile(bytes: 'Local file 1 content'.codeUnits);
-  cloudStorage['2'] = SyncFile(bytes: 'Cloud file 2 content'.codeUnits);
+  localStorage['1'] = 'Local file 1 content';
+  cloudStorage['2'] = 'Cloud file 2 content';
 
   final cloudSync = CloudSync(
     fetchLocalMetadataList: () async => localMetadata,
     fetchCloudMetadataList: () async => cloudMetadata,
-    fetchLocalFileByMetadata: (metadata) async {
+    fetchLocalDetail: (metadata) async {
       return localStorage[metadata.id]!;
     },
-    fetchCloudFileByMetadata: (metadata) async {
+    fetchCloudDetail: (metadata) async {
       return cloudStorage[metadata.id]!;
     },
-    writeFileToCloudStorage: (metadata, file) async {
+    writeDetailToCloud: (metadata, file) async {
       cloudStorage[metadata.id] = file;
     },
-    writeFileToLocalStorage: (metadata, file) async {
+    writeDetailToLocal: (metadata, file) async {
       localStorage[metadata.id] = file;
     },
   );

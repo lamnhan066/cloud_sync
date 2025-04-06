@@ -1,5 +1,4 @@
 import 'package:cloud_sync/src/cloud_sync.dart';
-import 'package:cloud_sync/src/models/sync_file.dart';
 import 'package:cloud_sync/src/models/sync_metadata.dart';
 import 'package:cloud_sync/src/models/sync_state.dart';
 import 'package:test/test.dart';
@@ -8,8 +7,8 @@ void main() {
   late CloudSync cloudSync;
   late List<SyncMetadata> localMetadataList;
   late List<SyncMetadata> cloudMetadataList;
-  late Map<String, SyncFile> localFiles;
-  late Map<String, SyncFile> cloudFiles;
+  late Map<String, Object> localFiles;
+  late Map<String, Object> cloudFiles;
 
   setUp(() {
     localMetadataList = [
@@ -41,25 +40,25 @@ void main() {
       ),
     ];
     localFiles = {
-      '1': SyncFile(bytes: [108, 111, 99, 97, 108, 70, 105, 108, 101, 49]),
-      '2': SyncFile(bytes: [108, 111, 99, 97, 108, 70, 105, 108, 101, 50]),
+      '1': [108, 111, 99, 97, 108, 70, 105, 108, 101, 49],
+      '2': [108, 111, 99, 97, 108, 70, 105, 108, 101, 50],
     };
     cloudFiles = {
-      '2': SyncFile(bytes: [99, 108, 111, 117, 100, 70, 105, 108, 101, 50]),
-      '3': SyncFile(bytes: [99, 108, 111, 117, 100, 70, 105, 108, 101, 51]),
+      '2': [99, 108, 111, 117, 100, 70, 105, 108, 101, 50],
+      '3': [99, 108, 111, 117, 100, 70, 105, 108, 101, 51],
     };
 
     cloudSync = CloudSync(
       fetchLocalMetadataList: () async => localMetadataList,
       fetchCloudMetadataList: () async => cloudMetadataList,
-      fetchLocalFileByMetadata: (metadata) async => localFiles[metadata.id]!,
-      fetchCloudFileByMetadata: (metadata) async => cloudFiles[metadata.id]!,
-      writeFileToCloudStorage: (metadata, file) async {
+      fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
+      fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
+      writeDetailToCloud: (metadata, file) async {
         cloudMetadataList.removeWhere((m) => m.id == metadata.id);
         cloudMetadataList.add(metadata);
         cloudFiles[metadata.id] = file;
       },
-      writeFileToLocalStorage: (metadata, file) async {
+      writeDetailToLocal: (metadata, file) async {
         localMetadataList.removeWhere((m) => m.id == metadata.id);
         localMetadataList.add(metadata);
         localFiles[metadata.id] = file;
@@ -76,7 +75,7 @@ void main() {
       expect(progressStates, contains(isA<SavingFileToCloud>()));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
       expect(cloudFiles.containsKey('1'), isTrue);
-      expect(cloudFiles['1']!.bytes, equals(localFiles['1']!.bytes));
+      expect(cloudFiles['1'], equals(localFiles['1']));
     });
 
     test(
@@ -88,7 +87,7 @@ void main() {
       expect(progressStates, contains(isA<SavingFileToLocal>()));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
       expect(localFiles.containsKey('3'), isTrue);
-      expect(localFiles['3']!.bytes, equals(cloudFiles['3']!.bytes));
+      expect(localFiles['3'], equals(cloudFiles['3']));
     });
 
     test('sync should not run if already in progress', () async {
@@ -104,10 +103,10 @@ void main() {
       cloudSync = CloudSync(
         fetchLocalMetadataList: () async => throw Exception('Test error'),
         fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalFileByMetadata: (metadata) async => localFiles[metadata.id]!,
-        fetchCloudFileByMetadata: (metadata) async => cloudFiles[metadata.id]!,
-        writeFileToLocalStorage: (metadata, file) async {},
-        writeFileToCloudStorage: (metadata, file) async {},
+        fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
+        writeDetailToLocal: (metadata, file) async {},
+        writeDetailToCloud: (metadata, file) async {},
       );
 
       final progressStates = <SyncState>[];
@@ -137,10 +136,10 @@ void main() {
         ),
       ];
       localFiles = {
-        '1': SyncFile(bytes: [115, 97, 109, 101, 70, 105, 108, 101]),
+        '1': [115, 97, 109, 101, 70, 105, 108, 101],
       };
       cloudFiles = {
-        '1': SyncFile(bytes: [115, 97, 109, 101, 70, 105, 108, 101]),
+        '1': [115, 97, 109, 101, 70, 105, 108, 101],
       };
 
       final progressStates = <SyncState>[];
@@ -175,8 +174,7 @@ void main() {
         modifiedAt: DateTime(2023, 1, 4),
         createdAt: DateTime(2023, 1, 4),
       ));
-      localFiles['4'] =
-          SyncFile(bytes: [108, 111, 99, 97, 108, 70, 105, 108, 101, 52]);
+      localFiles['4'] = [108, 111, 99, 97, 108, 70, 105, 108, 101, 52];
 
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
@@ -185,7 +183,7 @@ void main() {
       expect(progressStates, contains(isA<SavingFileToLocal>()));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
       expect(cloudFiles.containsKey('4'), isTrue);
-      expect(cloudFiles['4']!.bytes, equals(localFiles['4']!.bytes));
+      expect(cloudFiles['4'], equals(localFiles['4']));
     });
   });
 
@@ -200,10 +198,10 @@ void main() {
           return localMetadataList;
         },
         fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalFileByMetadata: (metadata) async => localFiles[metadata.id]!,
-        fetchCloudFileByMetadata: (metadata) async => cloudFiles[metadata.id]!,
-        writeFileToLocalStorage: (metadata, file) async {},
-        writeFileToCloudStorage: (metadata, file) async {},
+        fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
+        writeDetailToLocal: (metadata, file) async {},
+        writeDetailToCloud: (metadata, file) async {},
       );
 
       cloudSync.autoSync(
@@ -229,10 +227,10 @@ void main() {
           return localMetadataList;
         },
         fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalFileByMetadata: (metadata) async => localFiles[metadata.id]!,
-        fetchCloudFileByMetadata: (metadata) async => cloudFiles[metadata.id]!,
-        writeFileToLocalStorage: (metadata, file) async {},
-        writeFileToCloudStorage: (metadata, file) async {},
+        fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
+        writeDetailToLocal: (metadata, file) async {},
+        writeDetailToCloud: (metadata, file) async {},
       );
 
       cloudSync.autoSync(

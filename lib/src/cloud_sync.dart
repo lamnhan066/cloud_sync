@@ -2,69 +2,67 @@ library;
 
 import 'dart:async';
 
-import 'models/sync_file.dart';
 import 'models/sync_metadata.dart';
 import 'models/sync_state.dart';
 
-/// Type definition for a function that fetches a list of metadata.
+/// Fetches a list of [SyncMetadata] from a data source.
 typedef FetchMetadataList = Future<List<SyncMetadata>> Function();
 
-/// Type definition for a function that fetches a file based on metadata.
-typedef FetchFileByMetadata = Future<SyncFile> Function(SyncMetadata metadata);
+/// Fetches a data object based on [SyncMetadata].
+typedef FetchDetail = Future<Object> Function(SyncMetadata metadata);
 
-/// Type definition for a function that writes a file to a storage.
-typedef WriteFileToStorage = Future<void> Function(
-    SyncMetadata metadata, SyncFile file);
+/// Writes a data object to a storage location.
+typedef WriteDetail = Future<void> Function(
+    SyncMetadata metadata, Object detail);
 
-/// Type definition for a callback function to report synchronization progress.
+/// Reports synchronization progress via a [SyncState].
 typedef SyncProgressCallback = void Function(SyncState state);
 
-/// A class to handle synchronization between local and cloud storage.
+/// Handles synchronization between local and cloud storage.
+///
+/// Compares metadata and transfers missing or outdated data in both directions.
 class CloudSync {
-  /// Creates an instance of the [CloudSync] class.
+  /// Creates a [CloudSync] instance.
   ///
-  /// Requires functions for fetching metadata and files from both local and cloud storage,
-  /// as well as functions for writing files to local and cloud storage.
+  /// Requires fetch and write functions for both local and cloud storage.
   CloudSync({
     required this.fetchLocalMetadataList,
     required this.fetchCloudMetadataList,
-    required this.fetchLocalFileByMetadata,
-    required this.fetchCloudFileByMetadata,
-    required this.writeFileToLocalStorage,
-    required this.writeFileToCloudStorage,
+    required this.fetchLocalDetail,
+    required this.fetchCloudDetail,
+    required this.writeDetailToLocal,
+    required this.writeDetailToCloud,
   });
 
-  /// Function to fetch metadata from the local storage.
+  /// Fetches metadata from local storage.
   final FetchMetadataList fetchLocalMetadataList;
 
-  /// Function to fetch metadata from the cloud storage.
+  /// Fetches metadata from cloud storage.
   final FetchMetadataList fetchCloudMetadataList;
 
-  /// Function to fetch a file from the local storage based on metadata.
-  final FetchFileByMetadata fetchLocalFileByMetadata;
+  /// Fetches a data object from local storage based on metadata.
+  final FetchDetail fetchLocalDetail;
 
-  /// Function to fetch a file from the cloud storage based on metadata.
-  final FetchFileByMetadata fetchCloudFileByMetadata;
+  /// Fetches a data object from cloud storage based on metadata.
+  final FetchDetail fetchCloudDetail;
 
-  /// Function to save a file to the local storage.
-  final WriteFileToStorage writeFileToLocalStorage;
+  /// Writes a data object to local storage.
+  final WriteDetail writeDetailToLocal;
 
-  /// Function to save a file to the cloud storage.
-  final WriteFileToStorage writeFileToCloudStorage;
+  /// Writes a data object to cloud storage.
+  final WriteDetail writeDetailToCloud;
 
-  /// A flag indicating whether a synchronization operation is currently in progress.
+  /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
 
-  // Timer to periodically trigger auto-sync.
+  /// Timer used to trigger auto-sync periodically.
   Timer? _autoSyncTimer;
 
-  /// Starts the auto-sync process with a specified [interval].
+  /// Starts periodic auto-sync with the given [interval].
   ///
-  /// The [interval] determines how often the synchronization process is triggered.
-  /// An optional [progressCallback] can be provided to report the synchronization progress.
+  /// Optionally provides [progressCallback] to report sync progress.
   ///
-  /// **Note:** If a sync is already in progress when the timer fires, that sync attempt
-  /// will be skipped and not retried.
+  /// If a sync is already in progress when the timer fires, that cycle is skipped.
   void autoSync({
     required Duration interval,
     SyncProgressCallback? progressCallback,
@@ -78,21 +76,23 @@ class CloudSync {
 
   /// Stops the auto-sync process.
   ///
-  /// Cancels the periodic timer and resets the auto-sync state.
+  /// Cancels the timer and resets internal state.
   void stopAutoSync() {
     _autoSyncTimer?.cancel();
     _autoSyncTimer = null;
   }
 
-  /// Performs the synchronization process between local and cloud storage.
+  /// Performs a full synchronization between local and cloud storage.
   ///
-  /// This method fetches metadata from both local and cloud storage, compares them,
-  /// and ensures that missing or outdated files are synchronized in both directions.
+  /// 1. Fetches metadata from both sources.
+  /// 2. Identifies missing or outdated files.
+  /// 3. Uploads local changes to the cloud.
+  /// 4. Downloads cloud changes to local storage.
   ///
-  /// An optional [progressCallback] can be provided to report the synchronization progress.
+  /// Optionally reports progress via [progressCallback].
   ///
-  /// **Error Handling:** If any unhandled error occurs during the entire synchronization process,
-  /// it is rethrown after reporting to the [progressCallback].
+  /// If an unhandled error occurs during synchronization,
+  /// it is reported via the callback and rethrown.
   Future<void> sync({SyncProgressCallback? progressCallback}) async {
     if (_isSyncInProgress) {
       progressCallback?.call(AlreadyInProgress());
@@ -115,7 +115,7 @@ class CloudSync {
         for (var metadata in cloudMetadataList) metadata.id: metadata,
       };
 
-      // Step 3: Synchronize missing or outdated files to the cloud.
+      // Step 3: Upload missing or outdated files to the cloud.
       progressCallback?.call(CheckingCloudForMissingOrOutdatedFiles());
       for (final localMetadata in localMetadataList) {
         final cloudMetadata = cloudMetadataMap[localMetadata.id];
@@ -125,15 +125,15 @@ class CloudSync {
         if (isMissingOrOutdated) {
           progressCallback?.call(SavingFileToCloud(localMetadata));
           try {
-            final localFile = await fetchLocalFileByMetadata(localMetadata);
-            await writeFileToCloudStorage(localMetadata, localFile);
+            final localFile = await fetchLocalDetail(localMetadata);
+            await writeDetailToCloud(localMetadata, localFile);
           } catch (e, stackTrace) {
             progressCallback?.call(SynchronizationError(e, stackTrace));
           }
         }
       }
 
-      // Step 4: Synchronize missing or outdated files to the local storage.
+      // Step 4: Download missing or outdated files to local storage.
       progressCallback?.call(CheckingLocalForMissingOrOutdatedFiles());
       for (final cloudMetadata in cloudMetadataList) {
         final localMetadata = localMetadataMap[cloudMetadata.id];
@@ -143,15 +143,15 @@ class CloudSync {
         if (isMissingOrOutdated) {
           progressCallback?.call(SavingFileToLocal(cloudMetadata));
           try {
-            final cloudFile = await fetchCloudFileByMetadata(cloudMetadata);
-            await writeFileToLocalStorage(cloudMetadata, cloudFile);
+            final cloudFile = await fetchCloudDetail(cloudMetadata);
+            await writeDetailToLocal(cloudMetadata, cloudFile);
           } catch (e, stackTrace) {
             progressCallback?.call(SynchronizationError(e, stackTrace));
           }
         }
       }
 
-      // Step 5: Notify that the synchronization process has completed successfully.
+      // Step 5: Notify that synchronization completed successfully.
       progressCallback?.call(SynchronizationCompleted());
     } catch (error, stackTrace) {
       progressCallback?.call(SynchronizationError(error, stackTrace));
