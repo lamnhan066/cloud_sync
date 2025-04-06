@@ -2,10 +2,9 @@ library;
 
 import 'dart:async';
 
-import 'package:cloud_sync/src/models/sync_state.dart';
-
 import 'models/sync_file.dart';
 import 'models/sync_metadata.dart';
+import 'models/sync_state.dart';
 
 /// Type definition for a function that fetches a list of metadata.
 typedef FetchMetadataList = Future<List<SyncMetadata>> Function();
@@ -22,7 +21,7 @@ typedef SyncProgressCallback = void Function(SyncState state);
 
 /// A class to handle synchronization between local and cloud storage.
 class CloudSync {
-  /// Creates an instance of the `CloudSync` class.
+  /// Creates an instance of the [CloudSync] class.
   ///
   /// Requires functions for fetching metadata and files from both local and cloud storage,
   /// as well as functions for writing files to local and cloud storage.
