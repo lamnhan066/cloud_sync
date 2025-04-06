@@ -14,29 +14,21 @@ void main() {
     localMetadataList = [
       SyncMetadata(
         id: '1',
-        name: 'localFile1',
         modifiedAt: DateTime(2023, 1, 1),
-        createdAt: DateTime(2023, 1, 1),
       ),
       SyncMetadata(
         id: '2',
-        name: 'localFile2',
         modifiedAt: DateTime(2023, 1, 2),
-        createdAt: DateTime(2023, 1, 1),
       ),
     ];
     cloudMetadataList = [
       SyncMetadata(
         id: '2',
-        name: 'cloudFile2',
         modifiedAt: DateTime(2023, 1, 1),
-        createdAt: DateTime(2023, 1, 1),
       ),
       SyncMetadata(
         id: '3',
-        name: 'cloudFile3',
         modifiedAt: DateTime(2023, 1, 3),
-        createdAt: DateTime(2023, 1, 2),
       ),
     ];
     localFiles = {
@@ -72,7 +64,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<SavingFileToCloud>()));
+      expect(progressStates, contains(isA<WritingDetailToCloud>()));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
       expect(cloudFiles.containsKey('1'), isTrue);
       expect(cloudFiles['1'], equals(localFiles['1']));
@@ -84,7 +76,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<SavingFileToLocal>()));
+      expect(progressStates, contains(isA<WritingDetailToLocal>()));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
       expect(localFiles.containsKey('3'), isTrue);
       expect(localFiles['3'], equals(cloudFiles['3']));
@@ -122,17 +114,13 @@ void main() {
       localMetadataList = [
         SyncMetadata(
           id: '1',
-          name: 'sameFile',
           modifiedAt: DateTime(2023, 1, 1),
-          createdAt: DateTime(2023, 1, 1),
         ),
       ];
       cloudMetadataList = [
         SyncMetadata(
           id: '1',
-          name: 'sameFile',
           modifiedAt: DateTime(2023, 1, 1),
-          createdAt: DateTime(2023, 1, 1),
         ),
       ];
       localFiles = {
@@ -145,8 +133,8 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, isNot(contains(isA<SavingFileToLocal>())));
-      expect(progressStates, isNot(contains(isA<SavingFileToCloud>())));
+      expect(progressStates, isNot(contains(isA<WritingDetailToLocal>())));
+      expect(progressStates, isNot(contains(isA<WritingDetailToCloud>())));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
     });
 
@@ -161,26 +149,24 @@ void main() {
           firstSyncProgressStates, contains(isA<SynchronizationCompleted>()));
       expect(
           secondSyncProgressStates, contains(isA<SynchronizationCompleted>()));
-      expect(
-          secondSyncProgressStates, isNot(contains(isA<SavingFileToLocal>())));
-      expect(
-          secondSyncProgressStates, isNot(contains(isA<SavingFileToCloud>())));
+      expect(secondSyncProgressStates,
+          isNot(contains(isA<WritingDetailToLocal>())));
+      expect(secondSyncProgressStates,
+          isNot(contains(isA<WritingDetailToCloud>())));
     });
 
     test('sync should handle multiple files with different states', () async {
       localMetadataList.add(SyncMetadata(
         id: '4',
-        name: 'localFile4',
         modifiedAt: DateTime(2023, 1, 4),
-        createdAt: DateTime(2023, 1, 4),
       ));
       localFiles['4'] = [108, 111, 99, 97, 108, 70, 105, 108, 101, 52];
 
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<SavingFileToCloud>()));
-      expect(progressStates, contains(isA<SavingFileToLocal>()));
+      expect(progressStates, contains(isA<WritingDetailToCloud>()));
+      expect(progressStates, contains(isA<WritingDetailToLocal>()));
       expect(progressStates, contains(isA<SynchronizationCompleted>()));
       expect(cloudFiles.containsKey('4'), isTrue);
       expect(cloudFiles['4'], equals(localFiles['4']));

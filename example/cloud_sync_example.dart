@@ -8,8 +8,6 @@ void main() async {
   final localMetadata = <SyncMetadata>[
     SyncMetadata(
       id: '1',
-      name: 'file1.txt',
-      createdAt: DateTime(2023, 1, 1),
       modifiedAt: DateTime(2023, 1, 5),
     ),
   ];
@@ -17,8 +15,6 @@ void main() async {
   final cloudMetadata = <SyncMetadata>[
     SyncMetadata(
       id: '2',
-      name: 'file2.txt',
-      createdAt: DateTime(2023, 1, 1),
       modifiedAt: DateTime(2023, 1, 4),
     ),
   ];
@@ -47,10 +43,10 @@ void main() async {
   // Sync with logging
   await cloudSync.sync(progressCallback: (state) {
     print('[SYNC STATE] ${state.runtimeType}');
-    if (state is SavingFileToCloud) {
-      print('Uploading: ${state.metadata.name}');
-    } else if (state is SavingFileToLocal) {
-      print('Downloading: ${state.metadata.name}');
+    if (state is WritingDetailToCloud) {
+      print('Uploading: ${state.metadata.id}');
+    } else if (state is WritingDetailToLocal) {
+      print('Downloading: ${state.metadata.id}');
     } else if (state is SynchronizationCompleted) {
       print('✅ Sync completed!');
     } else if (state is SynchronizationError) {
