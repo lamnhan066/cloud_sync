@@ -83,16 +83,17 @@ class CloudSync<M extends SyncMetadata, D> {
     _autoSyncTimer = null;
   }
 
-  /// Performs a full synchronization between local and cloud storage.
+  /// Performs a full synchronization process between local and cloud storage.
   ///
-  /// Steps:
-  /// 1. Fetches metadata from both local and cloud storage.
-  /// 2. Identifies missing or outdated files in both locations.
-  /// 3. Uploads local changes to the cloud.
-  /// 4. Downloads cloud changes to local storage.
+  /// This method executes the following steps:
+  /// 1. Fetches metadata from both local and cloud storage to identify discrepancies.
+  /// 2. Determines which files are missing or outdated in either location.
+  /// 3. Uploads missing or updated files from local storage to the cloud.
+  /// 4. Downloads missing or updated files from the cloud to local storage.
   ///
-  /// Optionally reports progress via [progressCallback].
-  /// If an error occurs during synchronization, it is reported via the callback and rethrown.
+  /// Progress updates can be reported using the optional [progressCallback].
+  /// If an error occurs during synchronization, it is reported via the
+  /// [progressCallback] as a [SyncError] (if provided) or rethrown to the caller.
   Future<void> sync({SyncProgressCallback<M>? progressCallback}) async {
     if (_isSyncInProgress) {
       progressCallback?.call(AlreadyInProgress());
@@ -154,8 +155,11 @@ class CloudSync<M extends SyncMetadata, D> {
       // Step 5: Notify that synchronization completed successfully.
       progressCallback?.call(SyncCompleted());
     } catch (error, stackTrace) {
-      progressCallback?.call(SyncError(error, stackTrace));
-      rethrow;
+      if (progressCallback != null) {
+        progressCallback(SyncError(error, stackTrace));
+      } else {
+        rethrow;
+      }
     } finally {
       _isSyncInProgress = false;
     }
