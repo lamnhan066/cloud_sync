@@ -9,9 +9,9 @@ sealed class SyncState<M extends SyncMetadata> {
 
 /// Indicates that a synchronization operation is already in progress.
 /// Prevents multiple sync operations from running simultaneously.
-class AlreadyInProgress<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates an [AlreadyInProgress] state.
-  const AlreadyInProgress();
+class InProgress<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates an [InProgress] state.
+  const InProgress();
 }
 
 /// Indicates that metadata is being fetched from local storage.

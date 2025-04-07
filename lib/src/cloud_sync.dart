@@ -122,7 +122,7 @@ class CloudSync<M extends SyncMetadata, D> {
     }
 
     if (_isSyncInProgress) {
-      progress(() => AlreadyInProgress());
+      progress(() => InProgress());
       return;
     }
     _isSyncInProgress = true;
