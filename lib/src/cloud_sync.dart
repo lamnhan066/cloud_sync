@@ -87,6 +87,7 @@ class CloudSync<M extends SyncMetadata, D> {
   Completer<void>? _cancellationCompleter;
 
   /// Whether this instance has been disposed.
+  bool get isDisposed => _isDisposed;
   bool _isDisposed = false;
 
   /// Starts periodic auto-sync with the given [interval].
