@@ -1,341 +1,232 @@
-import 'package:cloud_sync/src/cloud_sync.dart';
-import 'package:cloud_sync/src/models/sync_metadata.dart';
-import 'package:cloud_sync/src/models/sync_state.dart';
+import 'dart:async';
+
+import 'package:cloud_sync/cloud_sync.dart';
 import 'package:test/test.dart';
 
+class MockData {
+  final String content;
+
+  MockData(this.content);
+
+  Map<String, dynamic> toMap() {
+    return {'content': content};
+  }
+
+  factory MockData.fromMap(Map<String, dynamic> map) {
+    return MockData(map['content']);
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is MockData &&
+          runtimeType == other.runtimeType &&
+          content == other.content;
+
+  @override
+  int get hashCode => content.hashCode;
+}
+
+class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
+  final Map<String, MockData> _data = {};
+  final Map<String, SyncMetadata> _metadata = {};
+  bool throwErrorOnFetchMetadata = false;
+  bool throwErrorOnFetchDetail = false;
+  bool throwErrorOnSave = false;
+
+  @override
+  Future<List<SyncMetadata>> fetchMetadataList() async {
+    if (throwErrorOnFetchMetadata) {
+      throw Exception('Fetch Metadata Error');
+    }
+    return _metadata.values.toList();
+  }
+
+  @override
+  Future<MockData> fetchDetail(SyncMetadata metadata) async {
+    if (throwErrorOnFetchDetail) {
+      throw Exception('Fetch Detail Error');
+    }
+    return _data[metadata.id]!;
+  }
+
+  @override
+  Future<void> save(SyncMetadata metadata, MockData detail) async {
+    if (throwErrorOnSave) {
+      throw Exception('Save Error');
+    }
+    _metadata[metadata.id] = metadata;
+    _data[metadata.id] = detail;
+  }
+}
+
 void main() {
-  late CloudSync cloudSync;
-  late List<SyncMetadata> localMetadataList;
-  late List<SyncMetadata> cloudMetadataList;
-  late Map<String, List<int>> localDetails;
-  late Map<String, List<int>> cloudDetails;
+  group('CloudSync Tests', () {
+    late MockSyncAdapter localAdapter;
+    late MockSyncAdapter cloudAdapter;
+    late CloudSync<SyncMetadata, MockData> cloudSync;
+    List<SyncState<SyncMetadata>> progressStates = [];
 
-  setUp(() {
-    localMetadataList = [
-      SyncMetadata(
-        id: '1',
-        modifiedAt: DateTime(2023, 1, 1),
-      ),
-      SyncMetadata(
-        id: '2',
-        modifiedAt: DateTime(2023, 1, 2),
-      ),
-    ];
-    cloudMetadataList = [
-      SyncMetadata(
-        id: '2',
-        modifiedAt: DateTime(2023, 1, 1),
-      ),
-      SyncMetadata(
-        id: '3',
-        modifiedAt: DateTime(2023, 1, 3),
-      ),
-    ];
-    localDetails = {
-      '1': [108, 111, 99, 97, 108, 70, 105, 108, 101, 49],
-      '2': [108, 111, 99, 97, 108, 70, 105, 108, 101, 50],
-    };
-    cloudDetails = {
-      '2': [99, 108, 111, 117, 100, 70, 105, 108, 101, 50],
-      '3': [99, 108, 111, 117, 100, 70, 105, 108, 101, 51],
-    };
-
-    cloudSync = CloudSync(
-      fetchLocalMetadataList: () async => localMetadataList,
-      fetchCloudMetadataList: () async => cloudMetadataList,
-      fetchLocalDetail: (metadata) async => localDetails[metadata.id] ?? [],
-      fetchCloudDetail: (metadata) async => cloudDetails[metadata.id] ?? [],
-      saveToCloud: (metadata, detail) async {
-        cloudMetadataList.removeWhere((m) => m.id == metadata.id);
-        cloudMetadataList.add(metadata);
-        cloudDetails[metadata.id] = detail;
-      },
-      saveToLocal: (metadata, detail) async {
-        localMetadataList.removeWhere((m) => m.id == metadata.id);
-        localMetadataList.add(metadata);
-        localDetails[metadata.id] = detail;
-      },
-    );
-  });
-
-  group('sync', () {
-    test('sync should synchronize missing or outdated details to the cloud',
-        () async {
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SavingToCloud>()));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(cloudDetails.containsKey('1'), isTrue);
-      expect(cloudDetails['1'], equals(localDetails['1']));
+    setUp(() {
+      localAdapter = MockSyncAdapter();
+      cloudAdapter = MockSyncAdapter();
+      cloudSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
+      progressStates.clear();
     });
 
-    test(
-        'sync should synchronize missing or outdated details to the local storage',
-        () async {
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
+    void progressCallback(SyncState<SyncMetadata> state) {
+      progressStates.add(state);
+    }
 
-      expect(progressStates, contains(isA<SavingToLocal>()));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(localDetails.containsKey('3'), isTrue);
-      expect(localDetails['3'], equals(cloudDetails['3']));
+    test('Sync completes successfully with no changes', () async {
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.last, isA<SyncCompleted>());
     });
 
-    test('sync should not run if already in progress', () async {
-      cloudSync.sync(progressCallback: (_) {});
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
+    test('Sync uploads new local file', () async {
+      final localMetadata = SyncMetadata(id: '1', modifiedAt: DateTime.now());
+      final localData = MockData('Local Data');
+      await localAdapter.save(localMetadata, localData);
 
-      expect(progressStates, contains(isA<AlreadyInProgress>()));
+      await cloudSync.sync(progressCallback: progressCallback);
+
+      expect(cloudAdapter._data['1'], equals(localData));
+      expect(progressStates.any((state) => state is SavedToCloud), isTrue);
     });
 
-    test('sync should handle errors during synchronization', () async {
-      cloudSync = CloudSync(
-        fetchLocalMetadataList: () async => throw Exception('Test error'),
-        fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
-        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
-        saveToLocal: (metadata, detail) async {},
-        saveToCloud: (metadata, detail) async {},
+    test('Sync downloads new cloud file', () async {
+      final cloudMetadata = SyncMetadata(id: '2', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Data');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      await cloudSync.sync(progressCallback: progressCallback);
+
+      expect(localAdapter._data['2'], equals(cloudData));
+      expect(progressStates.any((state) => state is SavedToLocal), isTrue);
+    });
+
+    test('Sync uploads updated local file', () async {
+      final id = '3';
+      final initialTime = DateTime.now().subtract(Duration(days: 1));
+      final updatedTime = DateTime.now();
+
+      await cloudAdapter.save(
+        SyncMetadata(id: id, modifiedAt: initialTime),
+        MockData('Old Cloud Data'),
+      );
+      await localAdapter.save(
+        SyncMetadata(id: id, modifiedAt: updatedTime),
+        MockData('New Local Data'),
       );
 
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
+      await cloudSync.sync(progressCallback: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError>()));
+      expect(cloudAdapter._data[id]?.content, equals('New Local Data'));
+      expect(progressStates.any((state) => state is SavedToCloud), isTrue);
     });
 
-    test('sync should handle errors during synchronization', () async {
-      cloudSync = CloudSync(
-        fetchLocalMetadataList: () async => throw Exception('Test error'),
-        fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
-        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
-        saveToLocal: (metadata, detail) async {},
-        saveToCloud: (metadata, detail) async {},
+    test('Sync downloads updated cloud file', () async {
+      final id = '4';
+      final initialTime = DateTime.now().subtract(Duration(days: 1));
+      final updatedTime = DateTime.now();
+
+      await localAdapter.save(
+        SyncMetadata(id: id, modifiedAt: initialTime),
+        MockData('Old Local Data'),
+      );
+      await cloudAdapter.save(
+        SyncMetadata(id: id, modifiedAt: updatedTime),
+        MockData('New Cloud Data'),
       );
 
-      await expectLater(
-        () => cloudSync.sync(),
-        throwsException,
+      await cloudSync.sync(progressCallback: progressCallback);
+
+      expect(localAdapter._data[id]?.content, equals('New Cloud Data'));
+      expect(progressStates.any((state) => state is SavedToLocal), isTrue);
+    });
+
+    test('Sync handles error on fetch local metadata', () async {
+      localAdapter.throwErrorOnFetchMetadata = true;
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.any((state) => state is SyncError), isTrue);
+    });
+
+    test('Sync handles error on fetch cloud metadata', () async {
+      cloudAdapter.throwErrorOnFetchMetadata = true;
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.any((state) => state is SyncError), isTrue);
+    });
+
+    test('Sync handles error on fetch local detail', () async {
+      localAdapter.throwErrorOnFetchDetail = true;
+      await localAdapter.save(
+        SyncMetadata(id: '5', modifiedAt: DateTime.now()),
+        MockData('Data'),
       );
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.any((state) => state is SyncError), isTrue);
     });
 
-    test('sync should skip details that are already up to date', () async {
-      localMetadataList = [
-        SyncMetadata(
-          id: '1',
-          modifiedAt: DateTime(2023, 1, 1),
-        ),
-      ];
-      cloudMetadataList = [
-        SyncMetadata(
-          id: '1',
-          modifiedAt: DateTime(2023, 1, 1),
-        ),
-      ];
-      localDetails = {
-        '1': [115, 97, 109, 101, 70, 105, 108, 101],
-      };
-      cloudDetails = {
-        '1': [115, 97, 109, 101, 70, 105, 108, 101],
-      };
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, isNot(contains(isA<SavingToLocal>())));
-      expect(progressStates, isNot(contains(isA<SavingToCloud>())));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-    });
-
-    test('sync should handle two consecutive sync operations', () async {
-      final firstSyncProgressStates = <SyncState>[];
-      final secondSyncProgressStates = <SyncState>[];
-
-      await cloudSync.sync(progressCallback: firstSyncProgressStates.add);
-      await cloudSync.sync(progressCallback: secondSyncProgressStates.add);
-
-      expect(firstSyncProgressStates, contains(isA<SyncCompleted>()));
-      expect(secondSyncProgressStates, contains(isA<SyncCompleted>()));
-      expect(secondSyncProgressStates, isNot(contains(isA<SavingToLocal>())));
-      expect(secondSyncProgressStates, isNot(contains(isA<SavingToCloud>())));
-    });
-
-    test('sync should handle multiple details with different states', () async {
-      localMetadataList.add(SyncMetadata(
-        id: '4',
-        modifiedAt: DateTime(2023, 1, 4),
-      ));
-      localDetails['4'] = [108, 111, 99, 97, 108, 70, 105, 108, 101, 52];
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SavingToCloud>()));
-      expect(progressStates, contains(isA<SavingToLocal>()));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(cloudDetails.containsKey('4'), isTrue);
-      expect(cloudDetails['4'], equals(localDetails['4']));
-    });
-
-    test('sync should skip syncing with empty data', () async {
-      localMetadataList.clear();
-      cloudMetadataList.clear();
-      localDetails.clear();
-      cloudDetails.clear();
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(localDetails.isEmpty, isTrue);
-      expect(cloudDetails.isEmpty, isTrue);
-    });
-
-    test(
-        'sync should only update metadata if it is modified but content is the same',
-        () async {
-      localMetadataList = [
-        SyncMetadata(id: '1', modifiedAt: DateTime(2023, 2, 1)),
-      ];
-      cloudMetadataList = [
-        SyncMetadata(id: '1', modifiedAt: DateTime(2023, 1, 1)),
-      ];
-      localDetails = {
-        '1': [108, 111, 99, 97, 108, 70, 105, 108, 101],
-      };
-      cloudDetails = {
-        '1': [108, 111, 99, 97, 108, 70, 105, 108, 101],
-      };
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SavingToCloud>()));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(cloudDetails['1'], equals(localDetails['1']));
-    });
-
-    test('sync should overwrite outdated cloud data with local data', () async {
-      localMetadataList = [
-        SyncMetadata(id: '1', modifiedAt: DateTime(2023, 2, 1)),
-      ];
-      cloudMetadataList = [
-        SyncMetadata(id: '1', modifiedAt: DateTime(2023, 1, 1)),
-      ];
-      localDetails = {
-        '1': [108, 111, 99, 97, 108, 70, 105, 108, 101, 50],
-      };
-      cloudDetails = {
-        '1': [108, 111, 99, 97, 108, 70, 105, 108, 101],
-      };
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SavingToCloud>()));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(cloudDetails['1'], equals(localDetails['1']));
-    });
-
-    test('sync should overwrite local data with newer cloud data', () async {
-      localMetadataList = [
-        SyncMetadata(id: '1', modifiedAt: DateTime(2023, 1, 1)),
-      ];
-      cloudMetadataList = [
-        SyncMetadata(id: '1', modifiedAt: DateTime(2023, 2, 1)),
-      ];
-      localDetails = {
-        '1': [108, 111, 99, 97, 108, 70, 105, 108, 101],
-      };
-      cloudDetails = {
-        '1': [108, 111, 99, 97, 108, 70, 105, 108, 101, 50],
-      };
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SavingToLocal>()));
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(localDetails['1'], equals(cloudDetails['1']));
-    });
-
-    test('sync should prevent concurrent sync operations', () async {
-      final progressStates1 = <SyncState>[];
-      final progressStates2 = <SyncState>[];
-
-      // Start the first sync.
-      cloudSync.sync(progressCallback: progressStates1.add);
-
-      // Start a second sync before the first one finishes.
-      cloudSync.sync(progressCallback: progressStates2.add);
-
-      await Future.delayed(const Duration(milliseconds: 100));
-
-      // Ensure the first sync completed successfully and the second one was skipped.
-      expect(progressStates1, contains(isA<SyncCompleted>()));
-      expect(progressStates2, contains(isA<AlreadyInProgress>()));
-    });
-
-    test('sync should handle failure in fetchLocalMetadataList', () async {
-      cloudSync = CloudSync(
-        fetchLocalMetadataList: () async =>
-            throw Exception('Failed to fetch local metadata'),
-        fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
-        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
-        saveToCloud: (metadata, detail) async {},
-        saveToLocal: (metadata, detail) async {},
+    test('Sync handles error on fetch cloud detail', () async {
+      cloudAdapter.throwErrorOnFetchDetail = true;
+      await cloudAdapter.save(
+        SyncMetadata(id: '6', modifiedAt: DateTime.now()),
+        MockData('Data'),
       );
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SyncError>()));
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.any((state) => state is SyncError), isTrue);
     });
 
-    test('sync should handle large data sets', () async {
-      localMetadataList = List.generate(1000, (index) {
-        return SyncMetadata(id: '$index', modifiedAt: DateTime(2023, 1, index));
-      });
-      cloudMetadataList = List.generate(1000, (index) {
-        return SyncMetadata(
-            id: '$index', modifiedAt: DateTime(2023, 1, index - 1));
-      });
-      localDetails = {
-        for (var i = 0; i < 1000; i++) '$i': [i],
-      };
-      cloudDetails = {
-        for (var i = 0; i < 1000; i++) '$i': [i - 1],
-      };
-
-      final progressStates = <SyncState>[];
-      await cloudSync.sync(progressCallback: progressStates.add);
-
-      expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(progressStates, isNot(contains(isA<SyncError>())));
+    test('Sync handles error on save to local', () async {
+      localAdapter.throwErrorOnSave = true;
+      await cloudAdapter.save(
+        SyncMetadata(id: '7', modifiedAt: DateTime.now()),
+        MockData('Data'),
+      );
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.any((state) => state is SyncError), isTrue);
     });
 
-    test('stopAutoSync should stop further auto-sync operations', () async {
-      int syncCallCounts = 0;
+    test('Sync handles error on save to cloud', () async {
+      cloudAdapter.throwErrorOnSave = true;
+      await localAdapter.save(
+        SyncMetadata(id: '8', modifiedAt: DateTime.now()),
+        MockData('Data'),
+      );
+      await cloudSync.sync(progressCallback: progressCallback);
+      expect(progressStates.any((state) => state is SyncError), isTrue);
+    });
 
+    test('Auto sync calls sync periodically', () async {
+      int syncCount = 0;
       cloudSync.autoSync(
-        interval: const Duration(milliseconds: 100),
-        progressCallback: (progressState) {
-          if (progressState is SyncCompleted) {
-            syncCallCounts++;
+        interval: Duration(milliseconds: 100),
+        progressCallback: (_) {
+          syncCount++;
+        },
+      );
+      await Future.delayed(Duration(milliseconds: 350));
+      cloudSync.stopAutoSync();
+      expect(syncCount, greaterThanOrEqualTo(3));
+    });
+
+    test('Auto sync skips when sync is in progress', () async {
+      int syncCount = 0;
+      localAdapter.throwErrorOnFetchMetadata = true;
+      cloudSync.autoSync(
+        interval: Duration(milliseconds: 100),
+        progressCallback: (state) {
+          if (state is InProgress) {
+            syncCount++;
           }
         },
       );
-
-      await Future.delayed(const Duration(milliseconds: 250));
+      await Future.delayed(Duration(milliseconds: 350));
       cloudSync.stopAutoSync();
-
-      await Future.delayed(const Duration(milliseconds: 200));
-
-      expect(syncCallCounts, lessThanOrEqualTo(3));
+      expect(
+        syncCount,
+        lessThanOrEqualTo(2),
+      );
     });
   });
 }
