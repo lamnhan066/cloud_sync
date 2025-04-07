@@ -2,28 +2,53 @@ import 'dart:convert';
 
 /// A model class representing metadata for synchronization.
 ///
-/// This class holds information about an entity's unique identifier and
-/// the timestamp of the last modification. It includes utility methods
-/// for creating instances, serialization, and deserialization.
+/// This class holds information about an entity's unique identifier,
+/// the timestamp of the last modification, and whether the entity
+/// has been deleted. It includes utility methods for creating instances,
+/// serialization, and deserialization.
 class SyncMetadata {
+  /// Creates a new instance of [SyncMetadata].
+  ///
+  /// [id] is the unique identifier for the metadata.
+  /// [modifiedAt] is the timestamp of the last modification.
+  /// [isDeleted] indicates whether the metadata has been marked as deleted.
+  /// By default, [isDeleted] is set to `false`.
+  const SyncMetadata({
+    required this.id,
+    required this.modifiedAt,
+    this.isDeleted = false,
+  });
+
+  /// Creates a new instance of [SyncMetadata] from a [Map].
+  ///
+  /// The [map] must contain the keys `id` and `modifiedAt`.
+  /// The `isDeleted` key is optional and defaults to `false` if not provided.
+  factory SyncMetadata.fromMap(Map<String, dynamic> map) {
+    return SyncMetadata(
+      id: (map['id'] ?? '') as String,
+      modifiedAt: DateTime.parse(map['modifiedAt'] as String),
+      isDeleted: (map['isDeleted'] as bool?) ?? false,
+    );
+  }
+
+  /// Creates a new instance of [SyncMetadata] from a JSON string.
+  ///
+  /// The [source] string must represent a valid JSON object.
+  factory SyncMetadata.fromJson(String source) =>
+      SyncMetadata.fromMap(json.decode(source) as Map<String, dynamic>);
+
   /// The unique identifier for the metadata.
   final String id;
 
   /// The timestamp of the last modification.
   final DateTime modifiedAt;
 
-  /// Indicates whether the metadata has been deleted.
+  /// Indicates whether the metadata has been marked as deleted.
   final bool isDeleted;
 
-  /// Creates a new instance of [SyncMetadata].
+  /// Creates a copy of the current [SyncMetadata] instance with updated fields.
   ///
-  /// Both [id] and [modifiedAt] are required parameters.
-  SyncMetadata({
-    required this.id,
-    required this.modifiedAt,
-    this.isDeleted = false,
-  });
-
+  /// Any field not provided will retain its current value.
   SyncMetadata copyWith({
     String? id,
     DateTime? modifiedAt,
@@ -36,6 +61,9 @@ class SyncMetadata {
     );
   }
 
+  /// Converts the [SyncMetadata] instance to a [Map].
+  ///
+  /// The resulting map contains the keys `id`, `modifiedAt`, and `isDeleted`.
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -44,33 +72,12 @@ class SyncMetadata {
     };
   }
 
-  factory SyncMetadata.fromMap(Map<String, dynamic> map) {
-    return SyncMetadata(
-      id: map['id'] ?? '',
-      modifiedAt: DateTime.parse(map['modifiedAt']),
-      isDeleted: map['isDeleted'] ?? false,
-    );
-  }
-
+  /// Converts the [SyncMetadata] instance to a JSON string.
+  ///
+  /// The JSON string represents the metadata as a serialized object.
   String toJson() => json.encode(toMap());
-
-  factory SyncMetadata.fromJson(String source) =>
-      SyncMetadata.fromMap(json.decode(source));
 
   @override
   String toString() =>
       'SyncMetadata(id: $id, modifiedAt: $modifiedAt, isDeleted: $isDeleted)';
-
-  @override
-  bool operator ==(Object other) {
-    if (identical(this, other)) return true;
-
-    return other is SyncMetadata &&
-        other.id == id &&
-        other.modifiedAt == modifiedAt &&
-        other.isDeleted == isDeleted;
-  }
-
-  @override
-  int get hashCode => id.hashCode ^ modifiedAt.hashCode ^ isDeleted.hashCode;
 }

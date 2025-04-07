@@ -1,11 +1,10 @@
 import 'dart:async';
 
+import 'package:cloud_sync/src/models/sync_adapter.dart';
 import 'package:cloud_sync/src/models/sync_errors.dart';
-
-import 'models/sync_adapter.dart';
-import 'models/sync_exceptions.dart';
-import 'models/sync_metadata.dart';
-import 'models/sync_state.dart';
+import 'package:cloud_sync/src/models/sync_exceptions.dart';
+import 'package:cloud_sync/src/models/sync_metadata.dart';
+import 'package:cloud_sync/src/models/sync_state.dart';
 
 /// Fetches a list of [SyncMetadata] from a data source.
 typedef FetchMetadataList<M extends SyncMetadata> = Future<List<M>> Function();
@@ -15,11 +14,11 @@ typedef FetchDetail<M extends SyncMetadata, D> = Future<D> Function(M metadata);
 
 /// Saves a data object to a storage location.
 typedef SaveDetail<M extends SyncMetadata, D> = Future<void> Function(
-    M metadata, D detail);
+    M metadata, D detail,);
 
 /// Reports synchronization progress via a [SyncState].
 typedef SyncProgressCallback<M extends SyncMetadata> = void Function(
-    SyncState<M> state);
+    SyncState<M> state,);
 
 /// Handles synchronization between local and cloud storage.
 ///
@@ -149,7 +148,7 @@ class CloudSync<M extends SyncMetadata, D> {
     }
 
     if (_isSyncInProgress) {
-      progress(() => InProgress());
+      progress(InProgress.new);
       return;
     }
     _isSyncInProgress = true;
@@ -161,26 +160,26 @@ class CloudSync<M extends SyncMetadata, D> {
       // Check if cancellation was requested before starting
       _checkCancellation();
 
-      progress(() => FetchingLocalMetadata());
+      progress(FetchingLocalMetadata.new);
       final localMetadataList = await fetchLocalMetadataList();
 
       _checkCancellation();
 
       final localMetadataMap = {
-        for (var metadata in localMetadataList) metadata.id: metadata,
+        for (final metadata in localMetadataList) metadata.id: metadata,
       };
 
-      progress(() => FetchingCloudMetadata());
+      progress(FetchingCloudMetadata.new);
       final cloudMetadataList = await fetchCloudMetadataList();
 
       _checkCancellation();
 
       final cloudMetadataMap = {
-        for (var metadata in cloudMetadataList) metadata.id: metadata,
+        for (final metadata in cloudMetadataList) metadata.id: metadata,
       };
 
       Future<void> processCloudSync() async {
-        progress(() => ScanningCloud());
+        progress(ScanningCloud.new);
         for (final localMetadata in localMetadataList) {
           _checkCancellation();
 
@@ -207,7 +206,7 @@ class CloudSync<M extends SyncMetadata, D> {
       }
 
       Future<void> processLocalSync() async {
-        progress(() => ScanningLocal());
+        progress(ScanningLocal.new);
         for (final cloudMetadata in cloudMetadataList) {
           _checkCancellation();
 
@@ -243,9 +242,9 @@ class CloudSync<M extends SyncMetadata, D> {
         await processCloudSync();
       }
 
-      progress(() => SyncCompleted());
+      progress(SyncCompleted.new);
     } on SyncCancelledException {
-      progress(() => SyncCancelled());
+      progress(SyncCancelled.new);
     } catch (error, stackTrace) {
       if (!progress(() => SyncError(error, stackTrace))) {
         rethrow;
@@ -262,11 +261,11 @@ class CloudSync<M extends SyncMetadata, D> {
   /// to allow for responsive cancellation.
   void _checkCancellation() {
     if (_cancellationCompleter != null && _cancellationCompleter!.isCompleted) {
-      throw SyncCancelledException();
+      throw const SyncCancelledException();
     }
 
     if (_isDisposed) {
-      throw SyncCancelledException();
+      throw const SyncCancelledException();
     }
   }
 

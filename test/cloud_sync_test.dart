@@ -5,27 +5,16 @@ import 'package:cloud_sync/src/models/sync_errors.dart';
 import 'package:test/test.dart';
 
 class MockData {
-  final String content;
-
   MockData(this.content);
+
+  factory MockData.fromMap(Map<String, dynamic> map) {
+    return MockData(map['content'] as String);
+  }
+  final String content;
 
   Map<String, dynamic> toMap() {
     return {'content': content};
   }
-
-  factory MockData.fromMap(Map<String, dynamic> map) {
-    return MockData(map['content']);
-  }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is MockData &&
-          runtimeType == other.runtimeType &&
-          content == other.content;
-
-  @override
-  int get hashCode => content.hashCode;
 
   @override
   String toString() => 'MockData(content: $content)';
@@ -68,7 +57,7 @@ class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
   Future<List<SyncMetadata>> fetchMetadataList() async {
     fetchMetadataCallCount++;
     if (fetchDelay > Duration.zero) {
-      await Future.delayed(fetchDelay);
+      await Future<void>.delayed(fetchDelay);
     }
     if (operationCompleter != null) {
       await operationCompleter!.future;
@@ -83,7 +72,7 @@ class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
   Future<MockData> fetchDetail(SyncMetadata metadata) async {
     fetchDetailCallCount++;
     if (fetchDelay > Duration.zero) {
-      await Future.delayed(fetchDelay);
+      await Future<void>.delayed(fetchDelay);
     }
     if (operationCompleter != null) {
       await operationCompleter!.future;
@@ -102,7 +91,7 @@ class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
   Future<void> save(SyncMetadata metadata, MockData detail) async {
     saveCallCount++;
     if (saveDelay > Duration.zero) {
-      await Future.delayed(saveDelay);
+      await Future<void>.delayed(saveDelay);
     }
     if (operationCompleter != null) {
       await operationCompleter!.future;
@@ -129,11 +118,12 @@ class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
 
 // Custom equality matcher for SyncState types
 class IsSyncStateType extends Matcher {
-  final Type expectedType;
   IsSyncStateType(this.expectedType);
+  final Type expectedType;
 
   @override
-  bool matches(item, Map matchState) => item.runtimeType == expectedType;
+  bool matches(dynamic item, Map<dynamic, dynamic> matchState) =>
+      item.runtimeType == expectedType;
 
   @override
   Description describe(Description description) =>
@@ -145,7 +135,7 @@ void main() {
     late MockSyncAdapter localAdapter;
     late MockSyncAdapter cloudAdapter;
     late CloudSync<SyncMetadata, MockData> cloudSync;
-    List<SyncState<SyncMetadata>> progressStates = [];
+    final progressStates = <SyncState<SyncMetadata>>[];
 
     setUp(() {
       localAdapter = MockSyncAdapter();
@@ -193,16 +183,17 @@ void main() {
       expect(cloudAdapter._metadata['1'], equals(localMetadata));
 
       expect(
-          progressStates,
-          containsAllInOrder([
-            isA<FetchingLocalMetadata>(),
-            isA<FetchingCloudMetadata>(),
-            isA<ScanningLocal>(),
-            isA<ScanningCloud>(),
-            isA<SavingToCloud>(),
-            isA<SavedToCloud>(),
-            isA<SyncCompleted>(),
-          ]));
+        progressStates,
+        containsAllInOrder([
+          isA<FetchingLocalMetadata>(),
+          isA<FetchingCloudMetadata>(),
+          isA<ScanningLocal>(),
+          isA<ScanningCloud>(),
+          isA<SavingToCloud>(),
+          isA<SavedToCloud>(),
+          isA<SyncCompleted>(),
+        ]),
+      );
 
       // Get the specific SavingToCloud state for further verification
       final savingState =
@@ -240,10 +231,10 @@ void main() {
     });
 
     test('Sync uploads updated local file', () async {
-      final id = '3';
+      const id = '3';
       // Use DateTime.now() carefully - add explicit microsecond offset
-      final initialTime = DateTime.now().subtract(Duration(hours: 1));
-      final updatedTime = initialTime.add(Duration(minutes: 30));
+      final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+      final updatedTime = initialTime.add(const Duration(minutes: 30));
 
       await cloudAdapter.save(
         SyncMetadata(id: id, modifiedAt: initialTime),
@@ -267,10 +258,10 @@ void main() {
     });
 
     test('Sync downloads updated cloud file', () async {
-      final id = '4';
+      const id = '4';
       // Use DateTimes with significant difference to avoid test flakiness
-      final initialTime = DateTime.now().subtract(Duration(hours: 1));
-      final updatedTime = initialTime.add(Duration(minutes: 30));
+      final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+      final updatedTime = initialTime.add(const Duration(minutes: 30));
 
       await localAdapter.save(
         SyncMetadata(id: id, modifiedAt: initialTime),
@@ -294,9 +285,9 @@ void main() {
 
     test('Sync handles item deleted in local propagating to cloud', () async {
       // Setup: Add item to both local and cloud
-      final id = 'deleted-item-local';
-      final initialTime = DateTime.now().subtract(Duration(hours: 1));
-      final deletionTime = initialTime.add(Duration(minutes: 30));
+      const id = 'deleted-item-local';
+      final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+      final deletionTime = initialTime.add(const Duration(minutes: 30));
 
       // Add regular item to both storages
       await localAdapter.save(
@@ -326,9 +317,9 @@ void main() {
 
     test('Sync handles item deleted in cloud propagating to local', () async {
       // Setup: Add item to both local and cloud
-      final id = 'deleted-item-cloud';
-      final initialTime = DateTime.now().subtract(Duration(hours: 1));
-      final deletionTime = initialTime.add(Duration(minutes: 30));
+      const id = 'deleted-item-cloud';
+      final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+      final deletionTime = initialTime.add(const Duration(minutes: 30));
 
       // Add regular item to both storages
       await localAdapter.save(
@@ -358,10 +349,10 @@ void main() {
 
     test('Sync resolves conflicting deletion and modification correctly',
         () async {
-      final id = 'conflict-delete-modify';
-      final initialTime = DateTime.now().subtract(Duration(hours: 1));
-      final deleteTime = initialTime.add(Duration(minutes: 15));
-      final modifyTime = initialTime.add(Duration(minutes: 30));
+      const id = 'conflict-delete-modify';
+      final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+      final deleteTime = initialTime.add(const Duration(minutes: 15));
+      final modifyTime = initialTime.add(const Duration(minutes: 30));
 
       // Setup: Add initial item to both
       await localAdapter.save(
@@ -479,10 +470,10 @@ void main() {
 
     test('Auto sync calls sync at least once within given timeframe', () async {
       // Instead of counting exact syncs, just verify at least one happens
-      bool syncCompleted = false;
+      var syncCompleted = false;
 
       cloudSync.autoSync(
-        interval: Duration(milliseconds: 100),
+        interval: const Duration(milliseconds: 100),
         progressCallback: (state) {
           if (state is SyncCompleted) {
             syncCompleted = true;
@@ -491,7 +482,7 @@ void main() {
       );
 
       // Wait with longer timeout to ensure at least one sync happens
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       cloudSync.stopAutoSync();
 
       expect(
@@ -502,13 +493,13 @@ void main() {
     });
 
     test('Auto sync can be stopped', () async {
-      int syncCount = 0;
+      var syncCount = 0;
 
       // Set up a control point we can use to block sync operation
       cloudAdapter.blockOperations();
 
       cloudSync.autoSync(
-        interval: Duration(milliseconds: 100),
+        interval: const Duration(milliseconds: 100),
         progressCallback: (state) {
           if (state is SyncCompleted) {
             syncCount++;
@@ -517,7 +508,7 @@ void main() {
       );
 
       // Wait a moment to ensure auto-sync is running
-      await Future.delayed(Duration(milliseconds: 200));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
 
       // Capture the current count (should be 0 since operations are blocked)
       final countBeforeStopping = syncCount;
@@ -529,7 +520,7 @@ void main() {
       cloudAdapter.unblockOperations();
 
       // Wait to ensure no new syncs start
-      await Future.delayed(Duration(milliseconds: 200));
+      await Future<void>.delayed(const Duration(milliseconds: 200));
 
       expect(
         syncCount,
@@ -540,11 +531,11 @@ void main() {
 
     test('Auto sync restarts properly with different interval', () async {
       // We'll detect the interval by tracking when events happen
-      List<DateTime> syncTimes = [];
+      final syncTimes = <DateTime>[];
 
       // First round with longer interval
       cloudSync.autoSync(
-        interval: Duration(milliseconds: 200),
+        interval: const Duration(milliseconds: 200),
         progressCallback: (state) {
           if (state is FetchingLocalMetadata) {
             syncTimes.add(DateTime.now());
@@ -553,7 +544,7 @@ void main() {
       );
 
       // Let it run for a bit
-      await Future.delayed(Duration(milliseconds: 650));
+      await Future<void>.delayed(const Duration(milliseconds: 650));
       cloudSync.stopAutoSync();
 
       // Should have about 3 sync events (at 0ms, ~200ms, ~400ms, ~600ms)
@@ -563,7 +554,7 @@ void main() {
 
       // Reset and start again with shorter interval
       cloudSync.autoSync(
-        interval: Duration(milliseconds: 100),
+        interval: const Duration(milliseconds: 100),
         progressCallback: (state) {
           if (state is FetchingLocalMetadata) {
             syncTimes.add(DateTime.now());
@@ -571,7 +562,7 @@ void main() {
         },
       );
 
-      await Future.delayed(Duration(milliseconds: 650));
+      await Future<void>.delayed(const Duration(milliseconds: 650));
       cloudSync.stopAutoSync();
 
       // Second round should have approximately twice as many events
@@ -584,14 +575,14 @@ void main() {
     });
 
     test('Auto sync skips when sync is in progress', () async {
-      int syncStartedCount = 0;
-      int syncSkippedCount = 0;
+      var syncStartedCount = 0;
+      var syncSkippedCount = 0;
 
       // Add significant delay to simulate long-running sync
-      cloudAdapter.fetchDelay = Duration(milliseconds: 300);
+      cloudAdapter.fetchDelay = const Duration(milliseconds: 300);
 
       cloudSync.autoSync(
-        interval: Duration(milliseconds: 100),
+        interval: const Duration(milliseconds: 100),
         progressCallback: (state) {
           progressCallback(state);
           if (state is FetchingLocalMetadata) {
@@ -604,7 +595,7 @@ void main() {
       );
 
       // Wait long enough for multiple intervals but not too many syncs
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       cloudSync.stopAutoSync();
 
       // Verify at least one sync started
@@ -707,7 +698,7 @@ void main() {
         () async {
       // Create metadata with exact same timestamp
       final now = DateTime.now();
-      final id = 'same-timestamp';
+      const id = 'same-timestamp';
 
       await localAdapter.save(
         SyncMetadata(id: id, modifiedAt: now),
@@ -727,7 +718,7 @@ void main() {
 
     test('Sync synchronizes multiple items correctly', () async {
       // Add multiple items to local
-      for (int i = 0; i < 5; i++) {
+      for (var i = 0; i < 5; i++) {
         await localAdapter.save(
           SyncMetadata(id: 'local-$i', modifiedAt: DateTime.now()),
           MockData('Local data $i'),
@@ -735,7 +726,7 @@ void main() {
       }
 
       // Add multiple items to cloud
-      for (int i = 0; i < 5; i++) {
+      for (var i = 0; i < 5; i++) {
         await cloudAdapter.save(
           SyncMetadata(id: 'cloud-$i', modifiedAt: DateTime.now()),
           MockData('Cloud data $i'),
@@ -745,7 +736,7 @@ void main() {
       await cloudSync.sync(progressCallback: progressCallback);
 
       // Verify all items were synced both ways
-      for (int i = 0; i < 5; i++) {
+      for (var i = 0; i < 5; i++) {
         expect(
           cloudAdapter._data['local-$i']?.content,
           equals('Local data $i'),
@@ -768,18 +759,18 @@ void main() {
       localAdapter.throwErrorOnFetchMetadata = true;
 
       // Without progress callback, errors are rethrown
-      expect(() async => await cloudSync.sync(), throwsA(isA<Exception>()));
+      expect(() async => cloudSync.sync(), throwsA(isA<Exception>()));
     });
 
     test('Auto sync skips when sync is in progress with timeout', () async {
-      int syncStartedCount = 0;
-      int syncSkippedCount = 0;
+      var syncStartedCount = 0;
+      var syncSkippedCount = 0;
 
       // Add significant delay to simulate long-running sync
-      cloudAdapter.fetchDelay = Duration(milliseconds: 300);
+      cloudAdapter.fetchDelay = const Duration(milliseconds: 300);
 
       cloudSync.autoSync(
-        interval: Duration(milliseconds: 100),
+        interval: const Duration(milliseconds: 100),
         progressCallback: (state) {
           progressCallback(state);
           if (state is FetchingLocalMetadata) {
@@ -792,7 +783,7 @@ void main() {
       );
 
       // Wait long enough for multiple intervals but not too many syncs
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       cloudSync.stopAutoSync();
 
       // Verify at least one sync started
@@ -820,8 +811,12 @@ void main() {
 
       //Test timeout.
       await expectLater(
-          Future.delayed(Duration(milliseconds: 1000), () => 'timeout'),
-          completion(equals('timeout')));
+        Future<void>.delayed(
+          const Duration(milliseconds: 1000),
+          () => 'timeout',
+        ),
+        completion(equals('timeout')),
+      );
     });
 
     test('Sync operation can be effectively cancelled', () async {
@@ -843,7 +838,7 @@ void main() {
           cancelableSync.sync(progressCallback: progressCallback);
 
       // Wait a moment to ensure sync has started
-      await Future.delayed(Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Cancel sync operation by disposing the CloudSync instance
       // This simulates what would happen in a real app when the sync is cancelled
@@ -876,7 +871,7 @@ void main() {
           cancelableSync.sync(progressCallback: progressCallback);
 
       // Wait a moment to ensure sync has started
-      await Future.delayed(Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Dispose the CloudSync instance
       cancelableSync.dispose();
@@ -889,12 +884,12 @@ void main() {
       await expectLater(syncFuture, completes);
 
       // Verify that after dispose, further sync calls throw an error.
-      expect(() => cancelableSync.sync(), throwsA(isA<SyncDisposedError>()));
+      expect(cancelableSync.sync, throwsA(isA<SyncDisposedError>()));
 
       //Verify that auto sync is also stopped.
       expect(
         () => cancelableSync.autoSync(
-          interval: Duration(milliseconds: 100),
+          interval: const Duration(milliseconds: 100),
         ),
         throwsA(isA<SyncDisposedError>()),
       );
@@ -902,7 +897,7 @@ void main() {
 
     test('Order independence: local-first equals cloud-first result', () async {
       // Create test data
-      final id = 'order-test';
+      const id = 'order-test';
       final timestamp = DateTime.now();
       final data = MockData('Consistent Data');
 
