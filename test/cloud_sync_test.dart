@@ -7,8 +7,8 @@ void main() {
   late CloudSync cloudSync;
   late List<SyncMetadata> localMetadataList;
   late List<SyncMetadata> cloudMetadataList;
-  late Map<String, Object> localFiles;
-  late Map<String, Object> cloudFiles;
+  late Map<String, List<int>> localDetails;
+  late Map<String, List<int>> cloudDetails;
 
   setUp(() {
     localMetadataList = [
@@ -31,11 +31,11 @@ void main() {
         modifiedAt: DateTime(2023, 1, 3),
       ),
     ];
-    localFiles = {
+    localDetails = {
       '1': [108, 111, 99, 97, 108, 70, 105, 108, 101, 49],
       '2': [108, 111, 99, 97, 108, 70, 105, 108, 101, 50],
     };
-    cloudFiles = {
+    cloudDetails = {
       '2': [99, 108, 111, 117, 100, 70, 105, 108, 101, 50],
       '3': [99, 108, 111, 117, 100, 70, 105, 108, 101, 51],
     };
@@ -43,48 +43,47 @@ void main() {
     cloudSync = CloudSync(
       fetchLocalMetadataList: () async => localMetadataList,
       fetchCloudMetadataList: () async => cloudMetadataList,
-      fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
-      fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
-      writeDetailToCloud: (metadata, file) async {
+      fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
+      fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
+      writeDetailToCloud: (metadata, detail) async {
         cloudMetadataList.removeWhere((m) => m.id == metadata.id);
         cloudMetadataList.add(metadata);
-        cloudFiles[metadata.id] = file;
+        cloudDetails[metadata.id] = detail;
       },
-      writeDetailToLocal: (metadata, file) async {
+      writeDetailToLocal: (metadata, detail) async {
         localMetadataList.removeWhere((m) => m.id == metadata.id);
         localMetadataList.add(metadata);
-        localFiles[metadata.id] = file;
+        localDetails[metadata.id] = detail;
       },
     );
   });
 
   group('sync', () {
-    test('sync should synchronize missing or outdated files to the cloud',
+    test('sync should synchronize missing or outdated details to the cloud',
         () async {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
       expect(progressStates, contains(isA<WritingDetailToCloud>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(cloudFiles.containsKey('1'), isTrue);
-      expect(cloudFiles['1'], equals(localFiles['1']));
+      expect(cloudDetails.containsKey('1'), isTrue);
+      expect(cloudDetails['1'], equals(localDetails['1']));
     });
 
     test(
-        'sync should synchronize missing or outdated files to the local storage',
+        'sync should synchronize missing or outdated details to the local storage',
         () async {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
       expect(progressStates, contains(isA<WritingDetailToLocal>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(localFiles.containsKey('3'), isTrue);
-      expect(localFiles['3'], equals(cloudFiles['3']));
+      expect(localDetails.containsKey('3'), isTrue);
+      expect(localDetails['3'], equals(cloudDetails['3']));
     });
 
     test('sync should not run if already in progress', () async {
-      cloudSync.sync();
-
+      cloudSync.sync(progressCallback: (_) {});
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
@@ -95,22 +94,35 @@ void main() {
       cloudSync = CloudSync(
         fetchLocalMetadataList: () async => throw Exception('Test error'),
         fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
-        fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
-        writeDetailToLocal: (metadata, file) async {},
-        writeDetailToCloud: (metadata, file) async {},
+        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
+        writeDetailToLocal: (metadata, detail) async {},
+        writeDetailToCloud: (metadata, detail) async {},
       );
 
       final progressStates = <SyncState>[];
-      await expectLater(
-        () => cloudSync.sync(progressCallback: progressStates.add),
-        throwsException,
-      );
+      await cloudSync.sync(progressCallback: progressStates.add);
 
       expect(progressStates, contains(isA<SyncError>()));
     });
 
-    test('sync should skip files that are already up to date', () async {
+    test('sync should handle errors during synchronization', () async {
+      cloudSync = CloudSync(
+        fetchLocalMetadataList: () async => throw Exception('Test error'),
+        fetchCloudMetadataList: () async => cloudMetadataList,
+        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
+        writeDetailToLocal: (metadata, detail) async {},
+        writeDetailToCloud: (metadata, detail) async {},
+      );
+
+      await expectLater(
+        () => cloudSync.sync(),
+        throwsException,
+      );
+    });
+
+    test('sync should skip details that are already up to date', () async {
       localMetadataList = [
         SyncMetadata(
           id: '1',
@@ -123,10 +135,10 @@ void main() {
           modifiedAt: DateTime(2023, 1, 1),
         ),
       ];
-      localFiles = {
+      localDetails = {
         '1': [115, 97, 109, 101, 70, 105, 108, 101],
       };
-      cloudFiles = {
+      cloudDetails = {
         '1': [115, 97, 109, 101, 70, 105, 108, 101],
       };
 
@@ -153,12 +165,12 @@ void main() {
           isNot(contains(isA<WritingDetailToCloud>())));
     });
 
-    test('sync should handle multiple files with different states', () async {
+    test('sync should handle multiple details with different states', () async {
       localMetadataList.add(SyncMetadata(
         id: '4',
         modifiedAt: DateTime(2023, 1, 4),
       ));
-      localFiles['4'] = [108, 111, 99, 97, 108, 70, 105, 108, 101, 52];
+      localDetails['4'] = [108, 111, 99, 97, 108, 70, 105, 108, 101, 52];
 
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
@@ -166,8 +178,8 @@ void main() {
       expect(progressStates, contains(isA<WritingDetailToCloud>()));
       expect(progressStates, contains(isA<WritingDetailToLocal>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
-      expect(cloudFiles.containsKey('4'), isTrue);
-      expect(cloudFiles['4'], equals(localFiles['4']));
+      expect(cloudDetails.containsKey('4'), isTrue);
+      expect(cloudDetails['4'], equals(localDetails['4']));
     });
   });
 
@@ -182,10 +194,10 @@ void main() {
           return localMetadataList;
         },
         fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
-        fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
-        writeDetailToLocal: (metadata, file) async {},
-        writeDetailToCloud: (metadata, file) async {},
+        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
+        writeDetailToLocal: (metadata, detail) async {},
+        writeDetailToCloud: (metadata, detail) async {},
       );
 
       cloudSync.autoSync(
@@ -211,10 +223,10 @@ void main() {
           return localMetadataList;
         },
         fetchCloudMetadataList: () async => cloudMetadataList,
-        fetchLocalDetail: (metadata) async => localFiles[metadata.id]!,
-        fetchCloudDetail: (metadata) async => cloudFiles[metadata.id]!,
-        writeDetailToLocal: (metadata, file) async {},
-        writeDetailToCloud: (metadata, file) async {},
+        fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
+        fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
+        writeDetailToLocal: (metadata, detail) async {},
+        writeDetailToCloud: (metadata, detail) async {},
       );
 
       cloudSync.autoSync(
