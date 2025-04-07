@@ -1,24 +1,25 @@
 # CloudSync
 
-> A flexible, type-safe data synchronization library for Dart applications
-
-CloudSync provides a robust mechanism for bidirectional data synchronization between local and cloud storage systems. It's designed with flexibility, observability, and type safety in mind.
+> A robust, type-safe synchronization solution for Dart applications
 
 [![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Overview
+## Features
 
-CloudSync intelligently handles the complexity of keeping data synchronized across different storage locations:
-
-- 🔄 **Bidirectional Sync** - Ensures both local and cloud stay updated
-- 🧠 **Smart Diffing** - Uses metadata timestamps to detect changes efficiently
-- 📊 **Progress Tracking** - Detailed state reporting for UI feedback
-- 🧩 **Modular Design** - Adapter-based or function injection approaches
-- ⏱️ **Auto-Sync** - Configurable periodic synchronization
-- 🛠️ **Concurrent Operation** - Optional parallel sync processing
+- 🔄 **Bidirectional Sync** - Keep local and cloud storage perfectly synchronized
+- ⏱ **Smart Conflict Resolution** - Timestamp-based change detection with "latest wins" strategy
+- 📊 **Comprehensive State Tracking** - 12 distinct sync states for complete visibility
+- 🛠 **Flexible Architecture** - Choose between adapter pattern or direct function injection
+- ⚡ **Concurrent Processing** - Optional parallel sync operations for performance
+- ⏳ **Auto-Sync** - Configurable periodic synchronization
+- ✋ **Cancellation Support** - Gracefully stop ongoing sync operations
+- 🧹 **Resource Management** - Proper cleanup with `dispose()` pattern
+- 🛡 **Error Resilient** - Built-in error handling and recovery
 
 ## Installation
+
+Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
@@ -33,191 +34,294 @@ flutter pub get
 
 ## Quick Start
 
-### Basic Usage
+### Basic Usage with Adapters
 
 ```dart
 import 'package:cloud_sync/cloud_sync.dart';
 
-// Create your CloudSync instance
+// 1. Define your metadata model
+class FileMetadata extends SyncMetadata {
+  final String filename;
+  
+  FileMetadata({
+    required super.id,
+    required super.modifiedAt,
+    required this.filename,
+    super.isDeleted = false,
+  });
+}
+
+// 2. Create adapters
+final localAdapter = LocalHiveAdapter(notesBox, metadataBox);
+final cloudAdapter = FirebaseCloudAdapter(firestore);
+
+// 3. Initialize CloudSync
 final cloudSync = CloudSync<FileMetadata, FileData>.fromAdapters(
-  LocalStorageAdapter(), // Just an example
-  GoogleDriveAppdataAdapter(), // Just an example
+  localAdapter,
+  cloudAdapter,
 );
 
-// Run a sync operation
+// 4. Perform sync
 await cloudSync.sync(
   progressCallback: (state) {
     if (state is SyncCompleted) {
       print('Sync completed successfully!');
     } else if (state is SyncError) {
-      print('Error: ${state.error}');
+      print('Error during sync: ${state.error}');
     }
   },
 );
 
-// Start automatic syncing every 5 minutes
+// 5. Set up auto-sync (optional)
 cloudSync.autoSync(
   interval: Duration(minutes: 5),
-  progressCallback: handleSyncState,
+  progressCallback: handleSyncProgress,
 );
+
+// 6. Clean up when done
+cloudSync.dispose();
 ```
 
-## Core Concepts
+## Core Architecture
 
-### Metadata-Based Sync
+### Metadata-Based Synchronization
 
-CloudSync uses metadata (like modification timestamps) to determine which items need synchronization. This approach is:
-
-- **Efficient** - Only transfers changed data
-- **Reliable** - Handles conflicts based on "latest wins" strategy
-- **Flexible** - Works with any data type that can be tracked with metadata
-
-### Sync Process Flow
-
-1. **Metadata Collection** - Gather metadata from both sources
-2. **Difference Detection** - Compare timestamps to find outdated/missing items
-3. **Data Transfer** - Move data in both directions as needed
-4. **State Reporting** - Report progress through callback events
-
-## Implementation Options
-
-### 1. Using Adapters (Recommended)
-
-Create adapters by implementing the `SyncAdapter` interface:
+CloudSync uses metadata to efficiently determine synchronization needs:
 
 ```dart
-// Define your metadata and data models
-class NoteMetadata extends SyncMetadata {
-  final String title;
-  
-  NoteMetadata({
-    required super.id,
-    required super.modifiedAt,
-    required this.title,
-  });
+abstract class SyncMetadata {
+  final String id;           // Unique identifier
+  final DateTime modifiedAt; // Last modification timestamp
+  final bool isDeleted;      // Tombstone marker for deletions
 }
+```
 
-class Note {
-  final String content;
-  final List<String> tags;
-  
-  Note({required this.content, this.tags = const []});
-}
+### The Sync Process
 
-// Create local adapter
-class LocalAdapter implements SyncAdapter<NoteMetadata, Note> {
-  final Map<String, Note> _notes = {};
-  final Map<String, NoteMetadata> _metadata = {};
-  
+1. **Metadata Collection** - Fetch metadata lists from both sources
+2. **Difference Detection** - Compare timestamps to identify changes
+3. **Data Transfer** - Synchronize changes in both directions
+4. **State Reporting** - Provide real-time progress updates
+
+## Implementation Guides
+
+### 1. Using the Adapter Pattern (Recommended)
+
+```dart
+class LocalHiveAdapter implements SyncAdapter<NoteMetadata, Note> {
+  const LocalHiveAdapter(this.notesBox, this.metadataBox);
+
+  final Box<Note> notesBox;
+  final Box<NoteMetadata> metadataBox;
+
   @override
   Future<List<NoteMetadata>> fetchMetadataList() async {
-    return _metadata.values.toList();
+    return metadataBox.values.toList();
   }
 
   @override
-  Future<Note> fetchDetail(NoteMetadata metadata) async {
-    return _notes[metadata.id] ?? 
-        throw Exception('Note not found: ${metadata.id}');
+  Future<Note> fetchDetail(NoteMetadata meta) async {
+    final note = notesBox.get(meta.id);
+    if (note == null) throw Exception('Note ${meta.id} not found');
+    return note;
   }
 
   @override
-  Future<void> save(NoteMetadata metadata, Note detail) async {
-    _metadata[metadata.id] = metadata;
-    _notes[metadata.id] = detail;
+  Future<void> save(NoteMetadata meta, Note note) async {
+    await notesBox.put(meta.id, note);
+    await metadataBox.put(meta.id, meta);
   }
 }
 
-// Create cloud adapter
-class CloudAdapter implements SyncAdapter<NoteMetadata, Note> {
-  // Similar implementation for cloud storage
-  // ...
-}
+class FirebaseCloudAdapter implements SyncAdapter<DocMetadata, Document> {
+  const FirebaseCloudAdapter(this.firestore);
 
-// Then create your sync instance
-final cloudSync = CloudSync.fromAdapters(
-  LocalAdapter(),
-  CloudAdapter(),
-);
+  final FirebaseFirestore firestore;
+
+  @override
+  Future<List<DocMetadata>> fetchMetadataList() async {
+    final snapshot = await firestore.collection('metadata').get();
+    return snapshot.docs.map((doc) => DocMetadata.fromMap(doc.data())).toList();
+  }
+
+  @override
+  Future<Document> fetchDetail(DocMetadata meta) async {
+    final doc = await firestore.collection('documents').doc(meta.id).get();
+    return Document.fromMap(doc.data()!);
+  }
+
+  @override
+  Future<void> save(DocMetadata meta, Document doc) async {
+    final batch = firestore.batch();
+    batch.set(firestore.collection('metadata').doc(meta.id), meta.toMap());
+    batch.set(firestore.collection('documents').doc(meta.id), doc.toMap());
+    await batch.commit();
+  }
+}
 ```
 
-### 2. Using Function Injection
-
-Provide individual functions for each operation:
+### 2. Using Direct Function Injection
 
 ```dart
-final cloudSync = CloudSync<NoteMetadata, Note>(
-  fetchLocalMetadataList: () async => await localDb.getAllMetadata(),
-  fetchCloudMetadataList: () async => await api.fetchAllMetadata(),
-  fetchLocalDetail: (meta) async => await localDb.getNote(meta.id),
-  fetchCloudDetail: (meta) async => await api.fetchNote(meta.id),
-  saveToLocal: (meta, note) async => await localDb.saveNote(meta.id, note),
-  saveToCloud: (meta, note) async => await api.uploadNote(meta.id, note),
+final cloudSync = CloudSync<PhotoMetadata, Photo>(
+  fetchLocalMetadataList: () => localDb.getPhotoMetadata(),
+  fetchCloudMetadataList: () => cloudApi.getPhotoMetadata(),
+  fetchLocalDetail: (meta) => localDb.getPhoto(meta.id),
+  fetchCloudDetail: (meta) => cloudApi.downloadPhoto(meta.id),
+  saveToLocal: (meta, photo) => localDb.savePhoto(meta.id, photo),
+  saveToCloud: (meta, photo) => cloudApi.uploadPhoto(meta.id, photo),
 );
 ```
 
 ## Advanced Features
 
-### Synchronization States
+### Comprehensive State Tracking
 
-Track sync progress with the sealed `SyncState` class hierarchy:
+Handle all 12 sync states:
 
 ```dart
-cloudSync.sync(
-  progressCallback: (state) {
-    switch (state) {
-      case FetchingLocalMetadata():
-        showProgressIndicator('Reading local data...');
-      case SavingToCloud(var metadata):
-        showProgressIndicator('Uploading ${metadata.name}...');
-      case SyncCompleted():
-        showSuccess('Sync completed!');
-      case SyncError(var error, var stack):
-        showError('Sync failed: $error');
-      // Handle other states...
-    }
-  },
-);
+void handleSyncState(SyncState<DocMetadata> state) {
+  switch (state) {
+    case FetchingLocalMetadata():
+      showLoading('Preparing sync...');
+    case SavingToCloud(metadata: final meta):
+      showProgress('Uploading ${meta.filename}...');
+    case SyncError(error: final err, stackTrace: final stack):
+      showError('Sync failed: ${err.toString()}');
+      logError(stack);
+    case SyncCompleted():
+      showSuccess('All documents synchronized!');
+    // Handle all states...
+  }
+}
 ```
 
 ### Concurrent Synchronization
 
-Scanning and updating local and cloud parallelly via `Future.wait`:
-
 ```dart
 await cloudSync.sync(
-  useConcurrentSync: true,
-  progressCallback: handleSyncProgress,
+  useConcurrentSync: true,  // Enable parallel processing
+  progressCallback: handleSyncState,
 );
 ```
 
-### Auto-Sync with Customization
+### Auto-Sync Management
 
 ```dart
-// Start auto-sync
+// Start auto-sync every 15 minutes
 cloudSync.autoSync(
-  interval: Duration(minutes: 10),
-  progressCallback: (state) {
-    // Handle sync states
-  },
+  interval: Duration(minutes: 15),
+  progressCallback: handleSyncState,
 );
 
-// Stop auto-sync (e.g., when app goes to background)
+// Later, when needed:
 cloudSync.stopAutoSync();
 ```
 
-## Creating Custom Models
+### Cancellation Support
 
-### 1. Extend SyncMetadata
+```dart
+final syncFuture = cloudSync.sync();
+
+// User cancels operation
+void onCancelPressed() {
+  cloudSync.cancelSync();
+}
+
+try {
+  await syncFuture;
+} on SyncCancelledException {
+  showMessage('Sync stopped by user');
+}
+```
+
+## Complete API Reference
+
+### CloudSync Methods
+
+| Method | Description | Throws |
+|--------|-------------|--------|
+| `sync()` | Perform full synchronization | `SyncCancelledException`, `SyncDisposedError` |
+| `autoSync()` | Start periodic auto-sync | `SyncDisposedError` |
+| `stopAutoSync()` | Stop auto-sync timer | - |
+| `cancelSync()` | Cancel ongoing sync | - |
+| `dispose()` | Release resources | - |
+
+### Sync States
+
+| State | Description | Contains |
+|-------|-------------|----------|
+| `InProgress` | Sync already running | - |
+| `FetchingLocalMetadata` | Getting local metadata | - |
+| `FetchingCloudMetadata` | Getting cloud metadata | - |
+| `ScanningLocal` | Comparing local changes | - |
+| `ScanningCloud` | Comparing cloud changes | - |
+| `SavingToLocal` | Saving to local storage | Metadata |
+| `SavedToLocal` | Local save complete | Metadata |
+| `SavingToCloud` | Uploading to cloud | Metadata |
+| `SavedToCloud` | Cloud upload complete | Metadata |
+| `SyncCompleted` | All operations done | - |
+| `SyncError` | Error occurred | Error + StackTrace |
+| `SyncCancelled` | Operation stopped | - |
+
+## Best Practices
+
+1. **Always implement `dispose()`**:
+
+   ```dart
+   @override
+   void dispose() {
+     cloudSync.dispose();
+     super.dispose();
+   }
+   ```
+
+2. **Handle all sync states** for best UX:
+
+   ```dart
+   void handleState(SyncState state) {
+     if (state is SavingToLocal || state is SavingToCloud) {
+       showProgressFor(state.metadata);
+     }
+     // Other states...
+   }
+   ```
+
+3. **Use concurrent sync** for better performance:
+
+   ```dart
+   await cloudSync.sync(useConcurrentSync: true);
+   ```
+
+4. **Implement proper error handling**:
+
+   ```dart
+   try {
+     await cloudSync.sync();
+   } on SyncDisposedError {
+     // Handle disposed instance
+   } on SyncCancelledException {
+     // Handle user cancellation
+   } catch (e) {
+     // Other errors
+   }
+   ```
+
+## Example Implementations
+
+### Complete Metadata Class
 
 ```dart
 class DocumentMetadata extends SyncMetadata {
   final String title;
+  final String author;
   final int version;
 
   DocumentMetadata({
     required super.id,
     required super.modifiedAt,
     required this.title,
+    required this.author,
     this.version = 1,
     super.isDeleted = false,
   });
@@ -228,6 +332,7 @@ class DocumentMetadata extends SyncMetadata {
     DateTime? modifiedAt,
     bool? isDeleted,
     String? title,
+    String? author,
     int? version,
   }) {
     return DocumentMetadata(
@@ -235,65 +340,35 @@ class DocumentMetadata extends SyncMetadata {
       modifiedAt: modifiedAt ?? this.modifiedAt,
       isDeleted: isDeleted ?? this.isDeleted,
       title: title ?? this.title,
+      author: author ?? this.author,
       version: version ?? this.version,
     );
   }
 
-  // Implement toMap, fromMap, etc.
+  // Add serialization methods as needed...
 }
 ```
 
-### 2. Define Your Data Model
+## Troubleshooting
 
-```dart
-class Document {
-  final String content;
-  final List<String> tags;
+## Error: "CloudSync object has been disposed"
 
-  Document({
-    required this.content,
-    this.tags = const [],
-  });
-  
-  // Your serialization methods
-}
-```
+- Ensure you're not using the instance after calling `dispose()`
+- Check your widget lifecycle to properly manage the CloudSync instance
 
-## API Reference
+### Sync stops unexpectedly
 
-### CloudSync Class
+- Implement all state handlers, especially `SyncError`
+- Check for cancellation points in your code
 
-| Method | Description |
-|--------|-------------|
-| `sync()` | Performs full synchronization between local and cloud |
-| `autoSync()` | Starts periodic automatic synchronization |
-| `stopAutoSync()` | Stops automatic synchronization |
+### Performance issues
 
-### SyncState Events
-
-| State | Description |
-|-------|-------------|
-| `InProgress` | A sync operation is already running |
-| `FetchingLocalMetadata` | Retrieving metadata from local storage |
-| `FetchingCloudMetadata` | Retrieving metadata from cloud storage |
-| `ScanningLocal` | Analyzing cloud data for local updates |
-| `ScanningCloud` | Analyzing local data for cloud updates |
-| `SavingToLocal` | Writing data to local storage |
-| `SavedToLocal` | Successfully saved data locally |
-| `SavingToCloud` | Uploading data to cloud storage |
-| `SavedToCloud` | Successfully uploaded data to cloud |
-| `SyncCompleted` | Synchronization process completed |
-| `SyncError` | Error occurred during synchronization |
-
-## Compatibility
-
-- Works with any Flutter or Dart application
-- Storage agnostic - use with any local database and cloud service
-- Null safety compliant
+- Consider using concurrent sync
+- Optimize your adapter implementations
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License - See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
