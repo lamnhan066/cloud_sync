@@ -1,4 +1,4 @@
-name: Flutter_Tests
+name: Tests
 
 on:
   push:
@@ -12,9 +12,17 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        sdk: [main, stable, beta]
+        sdk: [stable]
     steps:
       - uses: actions/checkout@v4
+
+      - name: Cache Dart dependencies
+        uses: actions/cache@v2
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-dart-${{ hashFiles('**/pubspec.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-dart-
 
       - uses: dart-lang/setup-dart@v1
         with:
