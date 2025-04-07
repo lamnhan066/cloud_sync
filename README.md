@@ -350,7 +350,7 @@ class DocumentMetadata extends SyncMetadata {
 
 ## Troubleshooting
 
-## Error: "CloudSync object has been disposed"
+### Error: "CloudSync object has been disposed"
 
 - Ensure you're not using the instance after calling `dispose()`
 - Check your widget lifecycle to properly manage the CloudSync instance
