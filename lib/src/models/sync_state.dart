@@ -3,51 +3,51 @@ import 'package:cloud_sync/src/models/sync_metadata.dart';
 /// Base class representing the state of a synchronization process.
 /// This serves as the foundation for all specific synchronization states.
 sealed class SyncState<M extends SyncMetadata> {
-  /// Constructor for the base synchronization state.
+  /// Creates a base synchronization state.
   const SyncState();
 }
 
 /// Represents a state where a synchronization operation is already in progress.
-/// This prevents multiple synchronization operations from running at the same time.
+/// Prevents multiple synchronization operations from running simultaneously.
 class AlreadyInProgress<M extends SyncMetadata> extends SyncState<M> {
-  /// Constructor for the "Already in progress" synchronization state.
+  /// Creates an "Already in progress" synchronization state.
   const AlreadyInProgress();
 }
 
 /// Represents a state where the system is fetching metadata from local storage.
-/// This is typically the initial step in the synchronization process.
+/// Typically the initial step in the synchronization process.
 class FetchingLocalMetadata<M extends SyncMetadata> extends SyncState<M> {
-  /// Constructor for the "Fetching local metadata" synchronization state.
+  /// Creates a "Fetching local metadata" synchronization state.
   const FetchingLocalMetadata();
 }
 
 /// Represents a state where the system is fetching metadata from the cloud.
-/// This is used to compare cloud data with local data during the synchronization process.
+/// Used to compare cloud data with local data during synchronization.
 class FetchingCloudMetadata<M extends SyncMetadata> extends SyncState<M> {
-  /// Constructor for the "Fetching cloud metadata" synchronization state.
+  /// Creates a "Fetching cloud metadata" synchronization state.
   const FetchingCloudMetadata();
 }
 
 /// Represents a state where the system is checking the cloud for missing or outdated data.
-/// This ensures that local storage is synchronized with the latest cloud data.
+/// Ensures that local storage is synchronized with the latest cloud data.
 class CheckingCloudForMissingOrOutdatedData<M extends SyncMetadata>
     extends SyncState<M> {
-  /// Constructor for the "Checking cloud for missing or outdated data" synchronization state.
+  /// Creates a "Checking cloud for missing or outdated data" synchronization state.
   const CheckingCloudForMissingOrOutdatedData();
 }
 
 /// Represents a state where the system is checking local storage for missing or outdated data.
-/// This ensures that the cloud is synchronized with the latest local data.
+/// Ensures that the cloud is synchronized with the latest local data.
 class CheckingLocalForMissingOrOutdatedData<M extends SyncMetadata>
     extends SyncState<M> {
-  /// Constructor for the "Checking local for missing or outdated data" synchronization state.
+  /// Creates a "Checking local for missing or outdated data" synchronization state.
   const CheckingLocalForMissingOrOutdatedData();
 }
 
 /// Represents a state where the system is writing metadata about a file to the cloud.
-/// This state includes details about the file being uploaded.
+/// Includes details about the file being uploaded.
 class WritingDetailToCloud<M extends SyncMetadata> extends SyncState<M> {
-  /// Constructor for the "Writing detail to cloud" synchronization state.
+  /// Creates a "Writing detail to cloud" synchronization state.
   ///
   /// [metadata] contains information about the file being uploaded to the cloud.
   const WritingDetailToCloud(this.metadata);
@@ -57,9 +57,9 @@ class WritingDetailToCloud<M extends SyncMetadata> extends SyncState<M> {
 }
 
 /// Represents a state where the system is writing metadata about a file to local storage.
-/// This state includes details about the file being saved locally.
+/// Includes details about the file being saved locally.
 class WritingDetailToLocal<M extends SyncMetadata> extends SyncState<M> {
-  /// Constructor for the "Writing detail to local" synchronization state.
+  /// Creates a "Writing detail to local" synchronization state.
   ///
   /// [metadata] contains information about the file being saved locally.
   const WritingDetailToLocal(this.metadata);
@@ -69,25 +69,35 @@ class WritingDetailToLocal<M extends SyncMetadata> extends SyncState<M> {
 }
 
 /// Represents a state where the synchronization process has completed successfully.
-/// This indicates the end of the synchronization operation without any errors.
-class SynchronizationCompleted<M extends SyncMetadata> extends SyncState<M> {
-  /// Constructor for the "Synchronization completed" state.
-  const SynchronizationCompleted();
+/// Indicates the end of the synchronization operation without any errors.
+@Deprecated('Use `SynchronizationCompleted` instead')
+typedef SynchronizationCompleted<M extends SyncMetadata> = SyncCompleted<M>;
+
+/// Represents a state where the synchronization process has completed successfully.
+/// Indicates the end of the synchronization operation without any errors.
+class SyncCompleted<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a "Synchronization completed" state.
+  const SyncCompleted();
 }
 
 /// Represents a state where an error occurred during the synchronization process.
-/// This state includes details about the error and its associated stack trace.
-class SynchronizationError<M extends SyncMetadata> extends SyncState<M>
-    implements Exception {
-  /// Constructor for the "Synchronization error" state.
+/// Includes details about the error and its associated stack trace.
+@Deprecated('Use `SyncError` instead')
+typedef SynchronizationError<M extends SyncMetadata> = SyncError<M>;
+
+/// Represents a state where an error occurred during the synchronization process.
+/// Includes details about the error and its associated stack trace.
+class SyncError<M extends SyncMetadata> extends SyncState<M> implements Error {
+  /// Creates a "Synchronization error" state.
   ///
   /// [error] is the exception or error that occurred during synchronization.
   /// [stackTrace] provides the stack trace associated with the error.
-  const SynchronizationError(this.error, this.stackTrace);
+  const SyncError(this.error, this.stackTrace);
 
   /// The error that occurred during synchronization.
   final Object error;
 
   /// The stack trace associated with the error.
+  @override
   final StackTrace stackTrace;
 }
