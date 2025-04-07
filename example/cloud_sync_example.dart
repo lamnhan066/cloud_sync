@@ -32,10 +32,10 @@ void main() async {
     fetchCloudDetail: (metadata) async {
       return cloudStorage[metadata.id]!;
     },
-    writeDetailToCloud: (metadata, file) async {
+    saveToCloud: (metadata, file) async {
       cloudStorage[metadata.id] = file;
     },
-    writeDetailToLocal: (metadata, file) async {
+    saveToLocal: (metadata, file) async {
       localStorage[metadata.id] = file;
     },
   );
@@ -43,9 +43,9 @@ void main() async {
   // Sync with logging
   await cloudSync.sync(progressCallback: (state) {
     print('[SYNC STATE] ${state.runtimeType}');
-    if (state is WritingDetailToCloud) {
+    if (state is SavingToCloud) {
       print('Uploading: ${state.metadata.id}');
-    } else if (state is WritingDetailToLocal) {
+    } else if (state is SavingToLocal) {
       print('Downloading: ${state.metadata.id}');
     } else if (state is SyncCompleted) {
       print('✅ Sync completed!');

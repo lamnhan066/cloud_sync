@@ -1,103 +1,101 @@
 import 'package:cloud_sync/src/models/sync_metadata.dart';
 
-/// Base class representing the state of a synchronization process.
-/// This serves as the foundation for all specific synchronization states.
+/// Base class for all synchronization states.
+/// Represents the current status of the sync process.
 sealed class SyncState<M extends SyncMetadata> {
-  /// Creates a base synchronization state.
+  /// Creates a base [SyncState].
   const SyncState();
 }
 
-/// Represents a state where a synchronization operation is already in progress.
-/// Prevents multiple synchronization operations from running simultaneously.
+/// Indicates that a synchronization operation is already in progress.
+/// Prevents multiple sync operations from running simultaneously.
 class AlreadyInProgress<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates an "Already in progress" synchronization state.
+  /// Creates an [AlreadyInProgress] state.
   const AlreadyInProgress();
 }
 
-/// Represents a state where the system is fetching metadata from local storage.
-/// Typically the initial step in the synchronization process.
+/// Indicates that metadata is being fetched from local storage.
+/// Usually the initial step of the sync process.
 class FetchingLocalMetadata<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates a "Fetching local metadata" synchronization state.
+  /// Creates a [FetchingLocalMetadata] state.
   const FetchingLocalMetadata();
 }
 
-/// Represents a state where the system is fetching metadata from the cloud.
-/// Used to compare cloud data with local data during synchronization.
+/// Indicates that metadata is being fetched from the cloud.
+/// Used to compare remote and local data.
 class FetchingCloudMetadata<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates a "Fetching cloud metadata" synchronization state.
+  /// Creates a [FetchingCloudMetadata] state.
   const FetchingCloudMetadata();
 }
 
-/// Represents a state where the system is checking the cloud for missing or outdated data.
-/// Ensures that local storage is synchronized with the latest cloud data.
-class CheckingCloudForMissingOrOutdatedData<M extends SyncMetadata>
-    extends SyncState<M> {
-  /// Creates a "Checking cloud for missing or outdated data" synchronization state.
-  const CheckingCloudForMissingOrOutdatedData();
+/// Indicates that the system is scanning the cloud for missing or outdated data.
+/// Ensures local storage is up-to-date with cloud changes.
+class ScanningCloud<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a [ScanningCloud] state.
+  const ScanningCloud();
 }
 
-/// Represents a state where the system is checking local storage for missing or outdated data.
-/// Ensures that the cloud is synchronized with the latest local data.
-class CheckingLocalForMissingOrOutdatedData<M extends SyncMetadata>
-    extends SyncState<M> {
-  /// Creates a "Checking local for missing or outdated data" synchronization state.
-  const CheckingLocalForMissingOrOutdatedData();
+/// Indicates that the system is scanning local storage for missing or outdated data.
+/// Ensures the cloud is up-to-date with local changes.
+class ScanningLocal<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a [ScanningLocal] state.
+  const ScanningLocal();
 }
 
-/// Represents a state where the system is writing metadata about a file to the cloud.
-/// Includes details about the file being uploaded.
-class WritingDetailToCloud<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates a "Writing detail to cloud" synchronization state.
-  ///
-  /// [metadata] contains information about the file being uploaded to the cloud.
-  const WritingDetailToCloud(this.metadata);
+/// Indicates that data is being saved to the cloud.
+/// Carries metadata about the item being uploaded.
+class SavingToCloud<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a [SavingToCloud] state with the given [metadata].
+  const SavingToCloud(this.metadata);
 
-  /// Metadata of the file being uploaded to the cloud.
+  /// Metadata for the item being saved to the cloud.
   final M metadata;
 }
 
-/// Represents a state where the system is writing metadata about a file to local storage.
-/// Includes details about the file being saved locally.
-class WritingDetailToLocal<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates a "Writing detail to local" synchronization state.
-  ///
-  /// [metadata] contains information about the file being saved locally.
-  const WritingDetailToLocal(this.metadata);
+/// Indicates that data was successfully saved to the cloud.
+class SavedToCloud<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a [SavedToCloud] state with the given [metadata].
+  const SavedToCloud(this.metadata);
 
-  /// Metadata of the file being saved locally.
+  /// Metadata for the item that was saved to the cloud.
   final M metadata;
 }
 
-/// Represents a state where the synchronization process has completed successfully.
-/// Indicates the end of the synchronization operation without any errors.
-@Deprecated('Use `SynchronizationCompleted` instead')
-typedef SynchronizationCompleted<M extends SyncMetadata> = SyncCompleted<M>;
+/// Indicates that data is being saved to local storage.
+/// Carries metadata about the item being stored.
+class SavingToLocal<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a [SavingToLocal] state with the given [metadata].
+  const SavingToLocal(this.metadata);
 
-/// Represents a state where the synchronization process has completed successfully.
-/// Indicates the end of the synchronization operation without any errors.
+  /// Metadata for the item being saved locally.
+  final M metadata;
+}
+
+/// Indicates that data was successfully saved to local storage.
+class SavedToLocal<M extends SyncMetadata> extends SyncState<M> {
+  /// Creates a [SavedToLocal] state with the given [metadata].
+  const SavedToLocal(this.metadata);
+
+  /// Metadata for the item that was saved locally.
+  final M metadata;
+}
+
+/// Indicates that synchronization completed successfully.
 class SyncCompleted<M extends SyncMetadata> extends SyncState<M> {
-  /// Creates a "Synchronization completed" state.
+  /// Creates a [SyncCompleted] state.
   const SyncCompleted();
 }
 
-/// Represents a state where an error occurred during the synchronization process.
-/// Includes details about the error and its associated stack trace.
-@Deprecated('Use `SyncError` instead')
-typedef SynchronizationError<M extends SyncMetadata> = SyncError<M>;
-
-/// Represents a state where an error occurred during the synchronization process.
-/// Includes details about the error and its associated stack trace.
+/// Indicates that an error occurred during synchronization.
+/// Includes the error and its associated stack trace.
 class SyncError<M extends SyncMetadata> extends SyncState<M>
     implements Exception {
-  /// Creates a "Synchronization error" state.
-  ///
-  /// [error] is the exception or error that occurred during synchronization.
-  /// [stackTrace] provides the stack trace associated with the error.
+  /// Creates a [SyncError] with the given [error] and [stackTrace].
   const SyncError(this.error, this.stackTrace);
 
-  /// The error that occurred during synchronization.
+  /// The error that occurred.
   final Object error;
 
-  /// The stack trace associated with the error.
+  /// The associated stack trace.
   final StackTrace stackTrace;
 }

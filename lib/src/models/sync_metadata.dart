@@ -13,8 +13,5 @@ class SyncMetadata {
   /// Creates a new instance of [SyncMetadata].
   ///
   /// Both [id] and [modifiedAt] are required parameters.
-  SyncMetadata({
-    required this.id,
-    required this.modifiedAt,
-  });
+  SyncMetadata({required this.id, required this.modifiedAt});
 }

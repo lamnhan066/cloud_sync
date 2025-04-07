@@ -45,12 +45,12 @@ void main() {
       fetchCloudMetadataList: () async => cloudMetadataList,
       fetchLocalDetail: (metadata) async => localDetails[metadata.id] ?? [],
       fetchCloudDetail: (metadata) async => cloudDetails[metadata.id] ?? [],
-      writeDetailToCloud: (metadata, detail) async {
+      saveToCloud: (metadata, detail) async {
         cloudMetadataList.removeWhere((m) => m.id == metadata.id);
         cloudMetadataList.add(metadata);
         cloudDetails[metadata.id] = detail;
       },
-      writeDetailToLocal: (metadata, detail) async {
+      saveToLocal: (metadata, detail) async {
         localMetadataList.removeWhere((m) => m.id == metadata.id);
         localMetadataList.add(metadata);
         localDetails[metadata.id] = detail;
@@ -64,7 +64,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<WritingDetailToCloud>()));
+      expect(progressStates, contains(isA<SavingToCloud>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
       expect(cloudDetails.containsKey('1'), isTrue);
       expect(cloudDetails['1'], equals(localDetails['1']));
@@ -76,7 +76,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<WritingDetailToLocal>()));
+      expect(progressStates, contains(isA<SavingToLocal>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
       expect(localDetails.containsKey('3'), isTrue);
       expect(localDetails['3'], equals(cloudDetails['3']));
@@ -96,8 +96,8 @@ void main() {
         fetchCloudMetadataList: () async => cloudMetadataList,
         fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
         fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
-        writeDetailToLocal: (metadata, detail) async {},
-        writeDetailToCloud: (metadata, detail) async {},
+        saveToLocal: (metadata, detail) async {},
+        saveToCloud: (metadata, detail) async {},
       );
 
       final progressStates = <SyncState>[];
@@ -112,8 +112,8 @@ void main() {
         fetchCloudMetadataList: () async => cloudMetadataList,
         fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
         fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
-        writeDetailToLocal: (metadata, detail) async {},
-        writeDetailToCloud: (metadata, detail) async {},
+        saveToLocal: (metadata, detail) async {},
+        saveToCloud: (metadata, detail) async {},
       );
 
       await expectLater(
@@ -145,8 +145,8 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, isNot(contains(isA<WritingDetailToLocal>())));
-      expect(progressStates, isNot(contains(isA<WritingDetailToCloud>())));
+      expect(progressStates, isNot(contains(isA<SavingToLocal>())));
+      expect(progressStates, isNot(contains(isA<SavingToCloud>())));
       expect(progressStates, contains(isA<SyncCompleted>()));
     });
 
@@ -159,10 +159,8 @@ void main() {
 
       expect(firstSyncProgressStates, contains(isA<SyncCompleted>()));
       expect(secondSyncProgressStates, contains(isA<SyncCompleted>()));
-      expect(secondSyncProgressStates,
-          isNot(contains(isA<WritingDetailToLocal>())));
-      expect(secondSyncProgressStates,
-          isNot(contains(isA<WritingDetailToCloud>())));
+      expect(secondSyncProgressStates, isNot(contains(isA<SavingToLocal>())));
+      expect(secondSyncProgressStates, isNot(contains(isA<SavingToCloud>())));
     });
 
     test('sync should handle multiple details with different states', () async {
@@ -175,8 +173,8 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<WritingDetailToCloud>()));
-      expect(progressStates, contains(isA<WritingDetailToLocal>()));
+      expect(progressStates, contains(isA<SavingToCloud>()));
+      expect(progressStates, contains(isA<SavingToLocal>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
       expect(cloudDetails.containsKey('4'), isTrue);
       expect(cloudDetails['4'], equals(localDetails['4']));
@@ -215,7 +213,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<WritingDetailToCloud>()));
+      expect(progressStates, contains(isA<SavingToCloud>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
       expect(cloudDetails['1'], equals(localDetails['1']));
     });
@@ -237,7 +235,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<WritingDetailToCloud>()));
+      expect(progressStates, contains(isA<SavingToCloud>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
       expect(cloudDetails['1'], equals(localDetails['1']));
     });
@@ -259,7 +257,7 @@ void main() {
       final progressStates = <SyncState>[];
       await cloudSync.sync(progressCallback: progressStates.add);
 
-      expect(progressStates, contains(isA<WritingDetailToLocal>()));
+      expect(progressStates, contains(isA<SavingToLocal>()));
       expect(progressStates, contains(isA<SyncCompleted>()));
       expect(localDetails['1'], equals(cloudDetails['1']));
     });
@@ -288,8 +286,8 @@ void main() {
         fetchCloudMetadataList: () async => cloudMetadataList,
         fetchLocalDetail: (metadata) async => localDetails[metadata.id]!,
         fetchCloudDetail: (metadata) async => cloudDetails[metadata.id]!,
-        writeDetailToCloud: (metadata, detail) async {},
-        writeDetailToLocal: (metadata, detail) async {},
+        saveToCloud: (metadata, detail) async {},
+        saveToLocal: (metadata, detail) async {},
       );
 
       final progressStates = <SyncState>[];

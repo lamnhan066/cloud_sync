@@ -11,8 +11,8 @@ typedef FetchMetadataList<M extends SyncMetadata> = Future<List<M>> Function();
 /// Fetches a data object based on [SyncMetadata].
 typedef FetchDetail<M extends SyncMetadata, D> = Future<D> Function(M metadata);
 
-/// Writes a data object to a storage location.
-typedef WriteDetail<M extends SyncMetadata, D> = Future<void> Function(
+/// Saves a data object to a storage location.
+typedef SaveDetail<M extends SyncMetadata, D> = Future<void> Function(
     M metadata, D detail);
 
 /// Reports synchronization progress via a [SyncState].
@@ -32,8 +32,8 @@ class CloudSync<M extends SyncMetadata, D> {
     required this.fetchCloudMetadataList,
     required this.fetchLocalDetail,
     required this.fetchCloudDetail,
-    required this.writeDetailToLocal,
-    required this.writeDetailToCloud,
+    required this.saveToLocal,
+    required this.saveToCloud,
   });
 
   /// Fetches metadata from local storage.
@@ -48,11 +48,11 @@ class CloudSync<M extends SyncMetadata, D> {
   /// Fetches a data object from cloud storage based on metadata.
   final FetchDetail<M, D> fetchCloudDetail;
 
-  /// Writes a data object to local storage.
-  final WriteDetail<M, D> writeDetailToLocal;
+  /// Saves a data object to local storage.
+  final SaveDetail<M, D> saveToLocal;
 
-  /// Writes a data object to cloud storage.
-  final WriteDetail<M, D> writeDetailToCloud;
+  /// Saves a data object to cloud storage.
+  final SaveDetail<M, D> saveToCloud;
 
   /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
@@ -95,65 +95,73 @@ class CloudSync<M extends SyncMetadata, D> {
   /// If an error occurs during synchronization, it is reported via the
   /// [progressCallback] as a [SyncError] (if provided) or rethrown to the caller.
   Future<void> sync({SyncProgressCallback<M>? progressCallback}) async {
+    void progress(SyncState<M> Function() state) {
+      if (progressCallback != null) {
+        progressCallback(state());
+      }
+    }
+
     if (_isSyncInProgress) {
-      progressCallback?.call(AlreadyInProgress());
+      progress(() => AlreadyInProgress());
       return;
     }
     _isSyncInProgress = true;
 
     try {
       // Step 1: Fetch metadata from local storage.
-      progressCallback?.call(FetchingLocalMetadata());
+      progress(() => FetchingLocalMetadata());
       final localMetadataList = await fetchLocalMetadataList();
       final localMetadataMap = {
         for (var metadata in localMetadataList) metadata.id: metadata,
       };
 
       // Step 2: Fetch metadata from cloud storage.
-      progressCallback?.call(FetchingCloudMetadata());
+      progress(() => FetchingCloudMetadata());
       final cloudMetadataList = await fetchCloudMetadataList();
       final cloudMetadataMap = {
         for (var metadata in cloudMetadataList) metadata.id: metadata,
       };
 
       // Step 3: Upload missing or outdated files to the cloud.
-      progressCallback?.call(CheckingCloudForMissingOrOutdatedData());
+      progress(() => ScanningCloud());
       for (final localMetadata in localMetadataList) {
         final cloudMetadata = cloudMetadataMap[localMetadata.id];
         final isMissingOrOutdated = cloudMetadata == null ||
             cloudMetadata.modifiedAt.isBefore(localMetadata.modifiedAt);
 
         if (isMissingOrOutdated) {
-          progressCallback?.call(WritingDetailToCloud(localMetadata));
+          progress(() => SavingToCloud(localMetadata));
           try {
             final localFile = await fetchLocalDetail(localMetadata);
-            await writeDetailToCloud(localMetadata, localFile);
+            await saveToCloud(localMetadata, localFile);
+            progress(() => SavedToCloud(localMetadata));
           } catch (e, stackTrace) {
-            progressCallback?.call(SyncError(e, stackTrace));
+            progress(() => SyncError(e, stackTrace));
           }
         }
       }
 
       // Step 4: Download missing or outdated files to local storage.
-      progressCallback?.call(CheckingLocalForMissingOrOutdatedData());
+      progress(() => ScanningLocal());
       for (final cloudMetadata in cloudMetadataList) {
         final localMetadata = localMetadataMap[cloudMetadata.id];
         final isMissingOrOutdated = localMetadata == null ||
             localMetadata.modifiedAt.isBefore(cloudMetadata.modifiedAt);
 
         if (isMissingOrOutdated) {
-          progressCallback?.call(WritingDetailToLocal(cloudMetadata));
+          progress(() => SavingToLocal(cloudMetadata));
           try {
             final cloudFile = await fetchCloudDetail(cloudMetadata);
-            await writeDetailToLocal(cloudMetadata, cloudFile);
+            await saveToLocal(cloudMetadata, cloudFile);
+            progress(() => SavedToLocal(cloudMetadata));
           } catch (e, stackTrace) {
-            progressCallback?.call(SyncError(e, stackTrace));
+            progress(() => SyncError(e, stackTrace));
           }
         }
       }
 
       // Step 5: Notify that synchronization completed successfully.
-      progressCallback?.call(SyncCompleted());
+      progress(() => SyncCompleted());
     } catch (error, stackTrace) {
       if (progressCallback != null) {
         progressCallback(SyncError(error, stackTrace));
