@@ -14,11 +14,14 @@ typedef FetchDetail<M extends SyncMetadata, D> = Future<D> Function(M metadata);
 
 /// Saves a data object to a storage location.
 typedef SaveDetail<M extends SyncMetadata, D> = Future<void> Function(
-    M metadata, D detail,);
+  M metadata,
+  D detail,
+);
 
 /// Reports synchronization progress via a [SyncState].
 typedef SyncProgressCallback<M extends SyncMetadata> = void Function(
-    SyncState<M> state,);
+  SyncState<M> state,
+);
 
 /// Handles synchronization between local and cloud storage.
 ///
@@ -244,7 +247,9 @@ class CloudSync<M extends SyncMetadata, D> {
 
       progress(SyncCompleted.new);
     } on SyncCancelledException {
-      progress(SyncCancelled.new);
+      if (!progress(SyncCancelled.new)) {
+        rethrow;
+      }
     } catch (error, stackTrace) {
       if (!progress(() => SyncError(error, stackTrace))) {
         rethrow;
