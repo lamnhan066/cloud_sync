@@ -54,8 +54,6 @@ class CloudSync<M extends SyncMetadata, D> {
   /// Writes a data object to cloud storage.
   final WriteDetail<M, D> writeDetailToCloud;
 
-  bool get isSyncInProgress => _isSyncInProgress;
-
   /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
 
