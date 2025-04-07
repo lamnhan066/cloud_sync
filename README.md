@@ -241,7 +241,7 @@ try {
 
 | Method | Description | Throws |
 |--------|-------------|--------|
-| `sync()` | Perform full synchronization | `SyncCancelledException`, `SyncDisposedError` |
+| `sync()` | Perform full synchronization | `SyncDisposedError` |
 | `autoSync()` | Start periodic auto-sync | `SyncDisposedError` |
 | `stopAutoSync()` | Stop auto-sync timer | - |
 | `cancelSync()` | Cancel ongoing sync | - |
@@ -300,8 +300,6 @@ try {
      await cloudSync.sync();
    } on SyncDisposedError {
      // Handle disposed instance
-   } on SyncCancelledException {
-     // Handle user cancellation
    } catch (e) {
      // Other errors
    }
