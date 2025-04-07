@@ -16,7 +16,8 @@ typedef WriteDetail<M extends SyncMetadata, D> = Future<void> Function(
     M metadata, D detail);
 
 /// Reports synchronization progress via a [SyncState].
-typedef SyncProgressCallback = void Function(SyncState state);
+typedef SyncProgressCallback<M extends SyncMetadata> = void Function(
+    SyncState<M> state);
 
 /// Handles synchronization between local and cloud storage.
 ///
@@ -92,7 +93,7 @@ class CloudSync<M extends SyncMetadata, D> {
   ///
   /// Optionally reports progress via [progressCallback].
   /// If an error occurs during synchronization, it is reported via the callback and rethrown.
-  Future<void> sync({SyncProgressCallback? progressCallback}) async {
+  Future<void> sync({SyncProgressCallback<M>? progressCallback}) async {
     if (_isSyncInProgress) {
       progressCallback?.call(AlreadyInProgress());
       return;
