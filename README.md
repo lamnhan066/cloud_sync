@@ -54,14 +54,14 @@ final cloudSync = CloudSync<MyMetadata, MyData>(
 
 // Manual sync
 await cloudSync.sync(progressCallback: (state) {
-  print('Sync state: \${state.runtimeType}');
+  print('Sync state: ${state.runtimeType}');
 });
 
 // Start auto-sync every 10 minutes
 cloudSync.autoSync(
   interval: Duration(minutes: 10),
   progressCallback: (state) {
-    print('Auto-sync state: \${state.runtimeType}');
+    print('Auto-sync state: ${state.runtimeType}');
   },
 );
 
@@ -103,7 +103,7 @@ CloudSync({
 | `FetchMetadataList<M>` | `Future<List<M>> Function()` | Fetches list of metadata |
 | `FetchDetail<M, D>` | `Future<D> Function(M)` | Retrieves data using metadata |
 | `WriteDetail<M, D>` | `Future<void> Function(M, D)` | Writes data to storage |
-| `SyncProgressCallback` | `void Function(SyncState)` | Reports progress updates |
+| `SyncProgressCallback<M>` | `void Function(SyncState<M>)` | Reports progress updates |
 
 ---
 
@@ -129,7 +129,7 @@ Extend this class to include more fields (e.g., `name`, `size`, etc.) as needed.
 
 ## Sync Lifecycle States
 
-`SyncState` is the base class for all sync progress reporting. Use it to show progress in UI or for logging.
+`SyncState<M>` is the base class for all sync progress reporting. Use it to show progress in UI or for logging.
 
 | State | Description |
 |-------|-------------|
@@ -140,8 +140,8 @@ Extend this class to include more fields (e.g., `name`, `size`, etc.) as needed.
 | `CheckingLocalForMissingOrOutdatedData` | Comparing cloud data against local data to find differences. |
 | `WritingDetailToCloud` | Writing a specific data/metadata pair to the cloud. |
 | `WritingDetailToLocal` | Writing a specific data/metadata pair to local storage. |
-| `SynchronizationCompleted` | Sync finished without errors. |
-| `SynchronizationError` | Sync failed with an error. |
+| `SyncCompleted` | Sync finished without errors. |
+| `SyncError` | Sync failed with an error. |
 
 Each state can be used for monitoring or UI updates.
 
@@ -157,7 +157,7 @@ Automatically sync data at regular intervals.
 cloudSync.autoSync(
   interval: Duration(minutes: 15),
   progressCallback: (state) {
-    print('Auto-sync: \${state.runtimeType}');
+    print('Auto-sync: ${state.runtimeType}');
   },
 );
 ```
@@ -187,6 +187,20 @@ class MyData {
   MyData(this.content);
 }
 ```
+
+---
+
+## Sync Implementation Details
+
+CloudSync performs synchronization in the following order:
+
+1. Fetch metadata from local and cloud sources
+2. Compare metadata to identify differences
+3. Upload missing or newer local files to the cloud
+4. Download missing or newer cloud files to local storage
+5. Report completion or errors
+
+Each step is reported through the `progressCallback` to provide visibility into the sync process.
 
 ---
 
