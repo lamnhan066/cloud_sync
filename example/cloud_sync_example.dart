@@ -1,60 +1,97 @@
 import 'package:cloud_sync/cloud_sync.dart';
 
+class MyData {
+  final String content;
+
+  MyData(this.content);
+
+  Map<String, dynamic> toMap() {
+    return {'content': content};
+  }
+
+  factory MyData.fromMap(Map<String, dynamic> map) {
+    return MyData(map['content']);
+  }
+
+  @override
+  String toString() => 'MyData(content: $content)';
+}
+
+class MyLocalAdapter extends SyncAdapter<SyncMetadata, MyData> {
+  final Map<String, MyData> _localData = {};
+  final Map<String, SyncMetadata> _localMetadata = {};
+
+  @override
+  Future<List<SyncMetadata>> fetchMetadataList() async {
+    return _localMetadata.values.toList();
+  }
+
+  @override
+  Future<MyData> fetchDetail(SyncMetadata metadata) async {
+    return _localData[metadata.id]!;
+  }
+
+  @override
+  Future<void> save(SyncMetadata metadata, MyData detail) async {
+    _localMetadata[metadata.id] = metadata;
+    _localData[metadata.id] = detail;
+  }
+}
+
+class MyCloudAdapter extends SyncAdapter<SyncMetadata, MyData> {
+  final Map<String, MyData> _cloudData = {};
+  final Map<String, SyncMetadata> _cloudMetadata = {};
+
+  @override
+  Future<List<SyncMetadata>> fetchMetadataList() async {
+    return _cloudMetadata.values.toList();
+  }
+
+  @override
+  Future<MyData> fetchDetail(SyncMetadata metadata) async {
+    return _cloudData[metadata.id]!;
+  }
+
+  @override
+  Future<void> save(SyncMetadata metadata, MyData detail) async {
+    _cloudMetadata[metadata.id] = metadata;
+    _cloudData[metadata.id] = detail;
+  }
+}
+
 void main() async {
-  // Mock metadata and file storage
-  final localStorage = <String, Object>{};
-  final cloudStorage = <String, Object>{};
+  final localAdapter = MyLocalAdapter();
+  final cloudAdapter = MyCloudAdapter();
 
-  final localMetadata = <SyncMetadata>[
-    SyncMetadata(
-      id: '1',
-      modifiedAt: DateTime(2023, 1, 5),
-    ),
-  ];
+  // Initialize CloudSync with local and cloud adapters
+  // and set up the sync process.
+  final cloudSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
 
-  final cloudMetadata = <SyncMetadata>[
-    SyncMetadata(
-      id: '2',
-      modifiedAt: DateTime(2023, 1, 4),
-    ),
-  ];
+  // Add some data to local and cloud.
+  final localMetadata = SyncMetadata(id: '1', modifiedAt: DateTime.now());
+  final localData = MyData('Local Data');
+  await localAdapter.save(localMetadata, localData);
 
-  // Add file content to local and cloud storages
-  localStorage['1'] = 'Local file 1 content';
-  cloudStorage['2'] = 'Cloud file 2 content';
+  final cloudMetadata = SyncMetadata(id: '2', modifiedAt: DateTime.now());
+  final cloudData = MyData('Cloud Data');
+  await cloudAdapter.save(cloudMetadata, cloudData);
 
-  final cloudSync = CloudSync(
-    fetchLocalMetadataList: () async => localMetadata,
-    fetchCloudMetadataList: () async => cloudMetadata,
-    fetchLocalDetail: (metadata) async {
-      return localStorage[metadata.id]!;
-    },
-    fetchCloudDetail: (metadata) async {
-      return cloudStorage[metadata.id]!;
-    },
-    saveToCloud: (metadata, file) async {
-      cloudStorage[metadata.id] = file;
-    },
-    saveToLocal: (metadata, file) async {
-      localStorage[metadata.id] = file;
-    },
-  );
-
-  // Sync with logging
+  // Perform sync
   await cloudSync.sync(progressCallback: (state) {
-    print('[SYNC STATE] ${state.runtimeType}');
-    if (state is SavingToCloud) {
-      print('Uploading: ${state.metadata.id}');
-    } else if (state is SavingToLocal) {
-      print('Downloading: ${state.metadata.id}');
-    } else if (state is SyncCompleted) {
-      print('✅ Sync completed!');
-    } else if (state is SyncError) {
-      print('❌ Error during sync: ${state.error}');
-    }
+    print('Sync state: ${state.runtimeType}');
   });
 
-  // Verify the final state
-  print('\nLocal files: ${localStorage.keys}');
-  print('Cloud files: ${cloudStorage.keys}');
+  // Fetch metadata and details from both adapters
+  final localMetadataList = await localAdapter.fetchMetadataList();
+  final cloudMetadataList = await cloudAdapter.fetchMetadataList();
+
+  for (var metadata in localMetadataList) {
+    final detail = await localAdapter.fetchDetail(metadata);
+    print('Local Metadata: $metadata, Detail: $detail');
+  }
+
+  for (var metadata in cloudMetadataList) {
+    final detail = await cloudAdapter.fetchDetail(metadata);
+    print('Cloud Metadata: $metadata, Detail: $detail');
+  }
 }
