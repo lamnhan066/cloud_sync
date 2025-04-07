@@ -103,18 +103,25 @@ class CloudSync<M extends SyncMetadata, D> {
     _autoSyncTimer = null;
   }
 
-  /// Performs a full synchronization process between local and cloud storage.
+  /// Initiates a full synchronization process between local and cloud storage.
   ///
-  /// This method executes the following steps:
-  /// 1. Fetches metadata from both local and cloud storage to identify discrepancies.
-  /// 2. Determines which files are missing or outdated in either location.
-  /// 3. Uploads missing or updated files from local storage to the cloud.
-  /// 4. Downloads missing or updated files from the cloud to local storage.
+  /// This method performs the following steps:
+  /// 1. Retrieves metadata from both local and cloud storage to identify any discrepancies.
+  /// 2. Compares the metadata to determine which files are missing or outdated in either location.
+  /// 3. Uploads any missing or updated files from the local storage to the cloud.
+  /// 4. Downloads any missing or updated files from the cloud to local storage.
   ///
-  /// Progress updates can be reported using the optional [progressCallback].
-  /// If an error occurs during synchronization, it is reported via the
-  /// [progressCallback] as a [SyncError] (if provided) or rethrown to the caller.
-  Future<void> sync({SyncProgressCallback<M>? progressCallback}) async {
+  /// Optionally, progress updates can be provided via the [progressCallback], which
+  /// receives a [SyncState] representing the current synchronization state.
+  /// In case of an error during synchronization, the error is reported using the
+  /// [SyncError] state (if the callback is provided) or rethrown to the caller.
+  ///
+  /// If [useConcurrentSync] is set to `true`, the synchronization of local and cloud storage
+  /// will run concurrently. Otherwise, they will be processed sequentially.
+  Future<void> sync({
+    SyncProgressCallback<M>? progressCallback,
+    bool useConcurrentSync = false,
+  }) async {
     void progress(SyncState<M> Function() state) {
       if (progressCallback != null) {
         progressCallback(state());
@@ -128,59 +135,68 @@ class CloudSync<M extends SyncMetadata, D> {
     _isSyncInProgress = true;
 
     try {
-      // Step 1: Fetch metadata from local storage.
       progress(() => FetchingLocalMetadata());
       final localMetadataList = await fetchLocalMetadataList();
       final localMetadataMap = {
         for (var metadata in localMetadataList) metadata.id: metadata,
       };
 
-      // Step 2: Fetch metadata from cloud storage.
       progress(() => FetchingCloudMetadata());
       final cloudMetadataList = await fetchCloudMetadataList();
       final cloudMetadataMap = {
         for (var metadata in cloudMetadataList) metadata.id: metadata,
       };
 
-      // Step 3: Upload missing or outdated files to the cloud.
-      progress(() => ScanningCloud());
-      for (final localMetadata in localMetadataList) {
-        final cloudMetadata = cloudMetadataMap[localMetadata.id];
-        final isMissingOrOutdated = cloudMetadata == null ||
-            cloudMetadata.modifiedAt.isBefore(localMetadata.modifiedAt);
+      Future<void> processCloudSync() async {
+        progress(() => ScanningCloud());
+        for (final localMetadata in localMetadataList) {
+          final cloudMetadata = cloudMetadataMap[localMetadata.id];
+          final isMissingOrOutdated = cloudMetadata == null ||
+              cloudMetadata.modifiedAt.isBefore(localMetadata.modifiedAt);
 
-        if (isMissingOrOutdated) {
-          progress(() => SavingToCloud(localMetadata));
-          try {
-            final localFile = await fetchLocalDetail(localMetadata);
-            await saveToCloud(localMetadata, localFile);
-            progress(() => SavedToCloud(localMetadata));
-          } catch (e, stackTrace) {
-            progress(() => SyncError(e, stackTrace));
+          if (isMissingOrOutdated) {
+            progress(() => SavingToCloud(localMetadata));
+            try {
+              final localFile = await fetchLocalDetail(localMetadata);
+              await saveToCloud(localMetadata, localFile);
+              progress(() => SavedToCloud(localMetadata));
+            } catch (e, stackTrace) {
+              progress(() => SyncError(e, stackTrace));
+            }
           }
         }
       }
 
-      // Step 4: Download missing or outdated files to local storage.
-      progress(() => ScanningLocal());
-      for (final cloudMetadata in cloudMetadataList) {
-        final localMetadata = localMetadataMap[cloudMetadata.id];
-        final isMissingOrOutdated = localMetadata == null ||
-            localMetadata.modifiedAt.isBefore(cloudMetadata.modifiedAt);
+      Future<void> processLocalSync() async {
+        progress(() => ScanningLocal());
+        for (final cloudMetadata in cloudMetadataList) {
+          final localMetadata = localMetadataMap[cloudMetadata.id];
+          final isMissingOrOutdated = localMetadata == null ||
+              localMetadata.modifiedAt.isBefore(cloudMetadata.modifiedAt);
 
-        if (isMissingOrOutdated) {
-          progress(() => SavingToLocal(cloudMetadata));
-          try {
-            final cloudFile = await fetchCloudDetail(cloudMetadata);
-            await saveToLocal(cloudMetadata, cloudFile);
-            progress(() => SavedToLocal(cloudMetadata));
-          } catch (e, stackTrace) {
-            progress(() => SyncError(e, stackTrace));
+          if (isMissingOrOutdated) {
+            progress(() => SavingToLocal(cloudMetadata));
+            try {
+              final cloudFile = await fetchCloudDetail(cloudMetadata);
+              await saveToLocal(cloudMetadata, cloudFile);
+              progress(() => SavedToLocal(cloudMetadata));
+            } catch (e, stackTrace) {
+              progress(() => SyncError(e, stackTrace));
+            }
           }
         }
       }
 
-      // Step 5: Notify that synchronization completed successfully.
+      if (useConcurrentSync) {
+        await Future.wait([
+          processLocalSync(),
+          processCloudSync(),
+        ]);
+      } else {
+        await processLocalSync();
+        await processCloudSync();
+      }
+
       progress(() => SyncCompleted());
     } catch (error, stackTrace) {
       if (progressCallback != null) {
