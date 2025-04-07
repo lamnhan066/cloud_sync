@@ -216,7 +216,7 @@ void main() {
       cloudSync.autoSync(
         interval: Duration(milliseconds: 100),
         progressCallback: (state) {
-          if (state is InProgress) {
+          if (state is SyncCompleted) {
             syncCount++;
           }
         },
@@ -227,6 +227,46 @@ void main() {
         syncCount,
         lessThanOrEqualTo(2),
       );
+    });
+
+    test('Concurrent sync works as expected', () async {
+      final localMetadata = SyncMetadata(id: '9', modifiedAt: DateTime.now());
+      final localData = MockData('Local Concurrent Data');
+      await localAdapter.save(localMetadata, localData);
+
+      final cloudMetadata = SyncMetadata(id: '10', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Concurrent Data');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      await cloudSync.sync(
+        progressCallback: progressCallback,
+        useConcurrentSync: true,
+      );
+
+      expect(cloudAdapter._data['9'], equals(localData));
+      expect(localAdapter._data['10'], equals(cloudData));
+      expect(progressStates.any((state) => state is SavedToCloud), isTrue);
+      expect(progressStates.any((state) => state is SavedToLocal), isTrue);
+    });
+
+    test('Sequential sync works as expected', () async {
+      final localMetadata = SyncMetadata(id: '11', modifiedAt: DateTime.now());
+      final localData = MockData('Local Sequential Data');
+      await localAdapter.save(localMetadata, localData);
+
+      final cloudMetadata = SyncMetadata(id: '12', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Sequential Data');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      await cloudSync.sync(
+        progressCallback: progressCallback,
+        useConcurrentSync: false,
+      );
+
+      expect(cloudAdapter._data['11'], equals(localData));
+      expect(localAdapter._data['12'], equals(cloudData));
+      expect(progressStates.any((state) => state is SavedToCloud), isTrue);
+      expect(progressStates.any((state) => state is SavedToLocal), isTrue);
     });
   });
 }
