@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:cloud_sync/cloud_sync.dart';
-import 'package:cloud_sync/src/models/sync_errors.dart';
 import 'package:test/test.dart';
 
 class MockData {
