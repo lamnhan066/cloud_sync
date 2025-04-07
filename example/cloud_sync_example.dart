@@ -47,9 +47,9 @@ void main() async {
       print('Uploading: ${state.metadata.id}');
     } else if (state is WritingDetailToLocal) {
       print('Downloading: ${state.metadata.id}');
-    } else if (state is SynchronizationCompleted) {
+    } else if (state is SyncCompleted) {
       print('✅ Sync completed!');
-    } else if (state is SynchronizationError) {
+    } else if (state is SyncError) {
       print('❌ Error during sync: ${state.error}');
     }
   });

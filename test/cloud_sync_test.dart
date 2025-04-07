@@ -65,7 +65,7 @@ void main() {
       await cloudSync.sync(progressCallback: progressStates.add);
 
       expect(progressStates, contains(isA<WritingDetailToCloud>()));
-      expect(progressStates, contains(isA<SynchronizationCompleted>()));
+      expect(progressStates, contains(isA<SyncCompleted>()));
       expect(cloudFiles.containsKey('1'), isTrue);
       expect(cloudFiles['1'], equals(localFiles['1']));
     });
@@ -77,7 +77,7 @@ void main() {
       await cloudSync.sync(progressCallback: progressStates.add);
 
       expect(progressStates, contains(isA<WritingDetailToLocal>()));
-      expect(progressStates, contains(isA<SynchronizationCompleted>()));
+      expect(progressStates, contains(isA<SyncCompleted>()));
       expect(localFiles.containsKey('3'), isTrue);
       expect(localFiles['3'], equals(cloudFiles['3']));
     });
@@ -107,7 +107,7 @@ void main() {
         throwsException,
       );
 
-      expect(progressStates, contains(isA<SynchronizationError>()));
+      expect(progressStates, contains(isA<SyncError>()));
     });
 
     test('sync should skip files that are already up to date', () async {
@@ -135,7 +135,7 @@ void main() {
 
       expect(progressStates, isNot(contains(isA<WritingDetailToLocal>())));
       expect(progressStates, isNot(contains(isA<WritingDetailToCloud>())));
-      expect(progressStates, contains(isA<SynchronizationCompleted>()));
+      expect(progressStates, contains(isA<SyncCompleted>()));
     });
 
     test('sync should handle two consecutive sync operations', () async {
@@ -145,10 +145,8 @@ void main() {
       await cloudSync.sync(progressCallback: firstSyncProgressStates.add);
       await cloudSync.sync(progressCallback: secondSyncProgressStates.add);
 
-      expect(
-          firstSyncProgressStates, contains(isA<SynchronizationCompleted>()));
-      expect(
-          secondSyncProgressStates, contains(isA<SynchronizationCompleted>()));
+      expect(firstSyncProgressStates, contains(isA<SyncCompleted>()));
+      expect(secondSyncProgressStates, contains(isA<SyncCompleted>()));
       expect(secondSyncProgressStates,
           isNot(contains(isA<WritingDetailToLocal>())));
       expect(secondSyncProgressStates,
@@ -167,7 +165,7 @@ void main() {
 
       expect(progressStates, contains(isA<WritingDetailToCloud>()));
       expect(progressStates, contains(isA<WritingDetailToLocal>()));
-      expect(progressStates, contains(isA<SynchronizationCompleted>()));
+      expect(progressStates, contains(isA<SyncCompleted>()));
       expect(cloudFiles.containsKey('4'), isTrue);
       expect(cloudFiles['4'], equals(localFiles['4']));
     });
@@ -200,7 +198,7 @@ void main() {
       cloudSync.stopAutoSync();
 
       expect(syncCallCounts.length, greaterThanOrEqualTo(3));
-      expect(progressStates, contains(isA<SynchronizationCompleted>()));
+      expect(progressStates, contains(isA<SyncCompleted>()));
     });
 
     test('stopAutoSync should cancel the periodic sync timer', () async {

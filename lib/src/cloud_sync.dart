@@ -128,7 +128,7 @@ class CloudSync<M extends SyncMetadata, D> {
             final localFile = await fetchLocalDetail(localMetadata);
             await writeDetailToCloud(localMetadata, localFile);
           } catch (e, stackTrace) {
-            progressCallback?.call(SynchronizationError(e, stackTrace));
+            progressCallback?.call(SyncError(e, stackTrace));
           }
         }
       }
@@ -146,15 +146,15 @@ class CloudSync<M extends SyncMetadata, D> {
             final cloudFile = await fetchCloudDetail(cloudMetadata);
             await writeDetailToLocal(cloudMetadata, cloudFile);
           } catch (e, stackTrace) {
-            progressCallback?.call(SynchronizationError(e, stackTrace));
+            progressCallback?.call(SyncError(e, stackTrace));
           }
         }
       }
 
       // Step 5: Notify that synchronization completed successfully.
-      progressCallback?.call(SynchronizationCompleted());
+      progressCallback?.call(SyncCompleted());
     } catch (error, stackTrace) {
-      progressCallback?.call(SynchronizationError(error, stackTrace));
+      progressCallback?.call(SyncError(error, stackTrace));
       rethrow;
     } finally {
       _isSyncInProgress = false;
