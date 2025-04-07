@@ -87,7 +87,8 @@ typedef SynchronizationError<M extends SyncMetadata> = SyncError<M>;
 
 /// Represents a state where an error occurred during the synchronization process.
 /// Includes details about the error and its associated stack trace.
-class SyncError<M extends SyncMetadata> extends SyncState<M> implements Error {
+class SyncError<M extends SyncMetadata> extends SyncState<M>
+    implements Exception {
   /// Creates a "Synchronization error" state.
   ///
   /// [error] is the exception or error that occurred during synchronization.
@@ -98,6 +99,5 @@ class SyncError<M extends SyncMetadata> extends SyncState<M> implements Error {
   final Object error;
 
   /// The stack trace associated with the error.
-  @override
   final StackTrace stackTrace;
 }
