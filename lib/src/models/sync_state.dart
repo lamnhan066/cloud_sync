@@ -88,8 +88,7 @@ class SyncCompleted<M extends SyncMetadata> extends SyncState<M> {
 
 /// Indicates that an error occurred during synchronization.
 /// Includes the error and its associated stack trace.
-class SyncError<M extends SyncMetadata> extends SyncState<M>
-    implements Exception {
+class SyncError<M extends SyncMetadata> extends SyncState<M> {
   /// Creates a [SyncError] with the given [error] and [stackTrace].
   const SyncError(this.error, this.stackTrace);
 

@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:cloud_sync/src/models/sync_errors.dart';
+
 import 'models/sync_adapter.dart';
 import 'models/sync_exceptions.dart';
 import 'models/sync_metadata.dart';
@@ -94,8 +96,7 @@ class CloudSync<M extends SyncMetadata, D> {
     SyncProgressCallback<M>? progressCallback,
   }) {
     if (_isDisposed) {
-      throw StateError(
-          'Cannot call autoSync() on a disposed CloudSync instance');
+      throw SyncDisposedError.withMethodName('autoSync()');
     }
 
     _autoSyncTimer?.cancel();
@@ -136,7 +137,7 @@ class CloudSync<M extends SyncMetadata, D> {
     bool useConcurrentSync = false,
   }) async {
     if (_isDisposed) {
-      throw StateError('Cannot call sync() on a disposed CloudSync instance');
+      throw SyncDisposedError.withMethodName('sync()');
     }
 
     bool progress(SyncState<M> Function() state) {
@@ -290,7 +291,7 @@ class CloudSync<M extends SyncMetadata, D> {
   ///
   /// After calling this method, the instance should not be used anymore.
   /// Attempting to call methods on a disposed instance will result in
-  /// a [StateError] being thrown.
+  /// a [SyncDisposedError] being thrown.
   void dispose() {
     if (_isDisposed) {
       return; // Already disposed
