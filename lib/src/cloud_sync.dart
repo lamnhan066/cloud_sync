@@ -247,9 +247,7 @@ class CloudSync<M extends SyncMetadata, D> {
 
       progress(SyncCompleted.new);
     } on SyncCancelledException {
-      if (!progress(SyncCancelled.new)) {
-        rethrow;
-      }
+      progress(SyncCancelled.new);
     } catch (error, stackTrace) {
       if (!progress(() => SyncError(error, stackTrace))) {
         rethrow;
