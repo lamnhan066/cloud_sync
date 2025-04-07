@@ -2,6 +2,7 @@ library;
 
 import 'dart:async';
 
+import 'models/sync_adapter.dart';
 import 'models/sync_metadata.dart';
 import 'models/sync_state.dart';
 
@@ -35,6 +36,25 @@ class CloudSync<M extends SyncMetadata, D> {
     required this.saveToLocal,
     required this.saveToCloud,
   });
+
+  /// Creates a [CloudSync] instance from the given [SyncAdapter]s.
+  ///
+  /// This factory simplifies creating a [CloudSync] by accepting adapters
+  /// for local and cloud storage. Each adapter supplies the necessary
+  /// fetch and save functions for synchronization.
+  factory CloudSync.fromAdapters(
+    SyncAdapter<M, D> localAdapter,
+    SyncAdapter<M, D> cloudAdapter,
+  ) {
+    return CloudSync<M, D>(
+      fetchLocalMetadataList: localAdapter.fetchMetadataList,
+      fetchCloudMetadataList: cloudAdapter.fetchMetadataList,
+      fetchLocalDetail: localAdapter.fetchDetail,
+      fetchCloudDetail: cloudAdapter.fetchDetail,
+      saveToLocal: localAdapter.save,
+      saveToCloud: cloudAdapter.save,
+    );
+  }
 
   /// Fetches metadata from local storage.
   final FetchMetadataList<M> fetchLocalMetadataList;
