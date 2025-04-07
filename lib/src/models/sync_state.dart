@@ -99,3 +99,9 @@ class SyncError<M extends SyncMetadata> extends SyncState<M>
   /// The associated stack trace.
   final StackTrace stackTrace;
 }
+
+/// State representing a cancelled sync operation.
+class SyncCancelled<M extends SyncMetadata> implements SyncState<M> {
+  @override
+  String toString() => 'Sync operation was cancelled';
+}

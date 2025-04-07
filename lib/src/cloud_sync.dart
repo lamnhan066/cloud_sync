@@ -1,8 +1,7 @@
-library;
-
 import 'dart:async';
 
 import 'models/sync_adapter.dart';
+import 'models/sync_exceptions.dart';
 import 'models/sync_metadata.dart';
 import 'models/sync_state.dart';
 
@@ -80,6 +79,12 @@ class CloudSync<M extends SyncMetadata, D> {
   /// Timer used to trigger auto-sync periodically.
   Timer? _autoSyncTimer;
 
+  /// Completer used to handle sync cancellation.
+  Completer<void>? _cancellationCompleter;
+
+  /// Whether this instance has been disposed.
+  bool _isDisposed = false;
+
   /// Starts periodic auto-sync with the given [interval].
   ///
   /// Optionally provides [progressCallback] to report sync progress.
@@ -88,6 +93,11 @@ class CloudSync<M extends SyncMetadata, D> {
     required Duration interval,
     SyncProgressCallback<M>? progressCallback,
   }) {
+    if (_isDisposed) {
+      throw StateError(
+          'Cannot call autoSync() on a disposed CloudSync instance');
+    }
+
     _autoSyncTimer?.cancel();
 
     _autoSyncTimer = Timer.periodic(interval, (_) async {
@@ -101,6 +111,9 @@ class CloudSync<M extends SyncMetadata, D> {
   void stopAutoSync() {
     _autoSyncTimer?.cancel();
     _autoSyncTimer = null;
+
+    // Cancel any ongoing sync operation
+    cancelSync();
   }
 
   /// Initiates a full synchronization process between local and cloud storage.
@@ -122,6 +135,10 @@ class CloudSync<M extends SyncMetadata, D> {
     SyncProgressCallback<M>? progressCallback,
     bool useConcurrentSync = false,
   }) async {
+    if (_isDisposed) {
+      throw StateError('Cannot call sync() on a disposed CloudSync instance');
+    }
+
     bool progress(SyncState<M> Function() state) {
       if (progressCallback != null) {
         progressCallback(state());
@@ -136,15 +153,27 @@ class CloudSync<M extends SyncMetadata, D> {
     }
     _isSyncInProgress = true;
 
+    // Create a new cancellation completer for this sync operation
+    _cancellationCompleter = Completer<void>();
+
     try {
+      // Check if cancellation was requested before starting
+      _checkCancellation();
+
       progress(() => FetchingLocalMetadata());
       final localMetadataList = await fetchLocalMetadataList();
+
+      _checkCancellation();
+
       final localMetadataMap = {
         for (var metadata in localMetadataList) metadata.id: metadata,
       };
 
       progress(() => FetchingCloudMetadata());
       final cloudMetadataList = await fetchCloudMetadataList();
+
+      _checkCancellation();
+
       final cloudMetadataMap = {
         for (var metadata in cloudMetadataList) metadata.id: metadata,
       };
@@ -152,6 +181,8 @@ class CloudSync<M extends SyncMetadata, D> {
       Future<void> processCloudSync() async {
         progress(() => ScanningCloud());
         for (final localMetadata in localMetadataList) {
+          _checkCancellation();
+
           final cloudMetadata = cloudMetadataMap[localMetadata.id];
           final isMissingOrOutdated = cloudMetadata == null ||
               cloudMetadata.modifiedAt.isBefore(localMetadata.modifiedAt);
@@ -160,6 +191,9 @@ class CloudSync<M extends SyncMetadata, D> {
             progress(() => SavingToCloud(localMetadata));
             try {
               final localFile = await fetchLocalDetail(localMetadata);
+
+              _checkCancellation();
+
               await saveToCloud(localMetadata, localFile);
               progress(() => SavedToCloud(localMetadata));
             } catch (error, stackTrace) {
@@ -174,6 +208,8 @@ class CloudSync<M extends SyncMetadata, D> {
       Future<void> processLocalSync() async {
         progress(() => ScanningLocal());
         for (final cloudMetadata in cloudMetadataList) {
+          _checkCancellation();
+
           final localMetadata = localMetadataMap[cloudMetadata.id];
           final isMissingOrOutdated = localMetadata == null ||
               localMetadata.modifiedAt.isBefore(cloudMetadata.modifiedAt);
@@ -182,6 +218,9 @@ class CloudSync<M extends SyncMetadata, D> {
             progress(() => SavingToLocal(cloudMetadata));
             try {
               final cloudFile = await fetchCloudDetail(cloudMetadata);
+
+              _checkCancellation();
+
               await saveToLocal(cloudMetadata, cloudFile);
               progress(() => SavedToLocal(cloudMetadata));
             } catch (error, stackTrace) {
@@ -202,13 +241,65 @@ class CloudSync<M extends SyncMetadata, D> {
         await processLocalSync();
         await processCloudSync();
       }
+
+      progress(() => SyncCompleted());
+    } on SyncCancelledException {
+      progress(() => SyncCancelled());
     } catch (error, stackTrace) {
       if (!progress(() => SyncError(error, stackTrace))) {
         rethrow;
       }
     } finally {
       _isSyncInProgress = false;
-      progress(() => SyncCompleted());
+      _cancellationCompleter = null;
     }
+  }
+
+  /// Checks if cancellation was requested and throws if it was.
+  ///
+  /// This method should be called at strategic points during sync
+  /// to allow for responsive cancellation.
+  void _checkCancellation() {
+    if (_cancellationCompleter != null && _cancellationCompleter!.isCompleted) {
+      throw SyncCancelledException();
+    }
+
+    if (_isDisposed) {
+      throw SyncCancelledException();
+    }
+  }
+
+  /// Cancels any ongoing sync operation.
+  ///
+  /// Returns true if there was an operation to cancel, false otherwise.
+  bool cancelSync() {
+    if (_cancellationCompleter != null &&
+        !_cancellationCompleter!.isCompleted) {
+      _cancellationCompleter!.complete();
+      return true;
+    }
+    return false;
+  }
+
+  /// Disposes resources used by this instance.
+  ///
+  /// This method:
+  /// 1. Stops any auto-sync processes
+  /// 2. Cancels any ongoing synchronization
+  /// 3. Marks the instance as disposed
+  ///
+  /// After calling this method, the instance should not be used anymore.
+  /// Attempting to call methods on a disposed instance will result in
+  /// a [StateError] being thrown.
+  void dispose() {
+    if (_isDisposed) {
+      return; // Already disposed
+    }
+
+    // Stop auto-sync and cancel any ongoing sync
+    stopAutoSync();
+
+    // Mark as disposed
+    _isDisposed = true;
   }
 }
