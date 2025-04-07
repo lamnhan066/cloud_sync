@@ -4,6 +4,7 @@
 
 [![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
 ## Features
 
@@ -221,18 +222,18 @@ cloudSync.stopAutoSync();
 ### Cancellation Support
 
 ```dart
-final syncFuture = cloudSync.sync();
+final syncFuture = cloudSync.sync(progressCallback: (state) {
+  if (state is SyncCancelled) {
+    showMessage('Sync stopped by user');
+  }
+});
 
 // User cancels operation
 void onCancelPressed() {
   cloudSync.cancelSync();
 }
 
-try {
-  await syncFuture;
-} on SyncCancelledException {
-  showMessage('Sync stopped by user');
-}
+await syncFuture;
 ```
 
 ## Complete API Reference
