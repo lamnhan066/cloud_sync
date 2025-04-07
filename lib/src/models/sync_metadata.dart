@@ -60,4 +60,17 @@ class SyncMetadata {
   @override
   String toString() =>
       'SyncMetadata(id: $id, modifiedAt: $modifiedAt, isDeleted: $isDeleted)';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+
+    return other is SyncMetadata &&
+        other.id == id &&
+        other.modifiedAt == modifiedAt &&
+        other.isDeleted == isDeleted;
+  }
+
+  @override
+  int get hashCode => id.hashCode ^ modifiedAt.hashCode ^ isDeleted.hashCode;
 }
