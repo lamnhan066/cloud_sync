@@ -1,22 +1,24 @@
 # CloudSync
 
-**CloudSync** is a Dart package that provides a flexible and type-safe mechanism to synchronize data between **local** and **cloud** storage. Designed with composability and progress observability in mind, this utility uses metadata comparison to detect changes and synchronize them efficiently.
+> A flexible, type-safe data synchronization library for Dart applications
 
-## Features
+CloudSync provides a robust mechanism for bidirectional data synchronization between local and cloud storage systems. It's designed with flexibility, observability, and type safety in mind.
 
-- Two-way sync between local and cloud
-- Smart diffing using metadata timestamps
-- Progress tracking with callback-based state reporting 
-- Modular architecture with adapter-based or function injection for I/O
-- Automatic periodic syncing
-- Error handling with detailed sync state events
-- Concurrent synchronization option
+[![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-## Getting Started
+## Overview
 
-### 1. Install
+CloudSync intelligently handles the complexity of keeping data synchronized across different storage locations:
 
-Add `cloud_sync` to your `pubspec.yaml`:
+- 🔄 **Bidirectional Sync** - Ensures both local and cloud stay updated
+- 🧠 **Smart Diffing** - Uses metadata timestamps to detect changes efficiently
+- 📊 **Progress Tracking** - Detailed state reporting for UI feedback
+- 🧩 **Modular Design** - Adapter-based or function injection approaches
+- ⏱️ **Auto-Sync** - Configurable periodic synchronization
+- 🛠️ **Concurrent Operation** - Optional parallel sync processing
+
+## Installation
 
 ```yaml
 dependencies:
@@ -29,229 +31,270 @@ Then run:
 flutter pub get
 ```
 
-### 2. Import
+## Quick Start
+
+### Basic Usage
 
 ```dart
 import 'package:cloud_sync/cloud_sync.dart';
-```
 
-## Usage Examples
-
-### Function-Based Approach
-
-```dart
-final cloudSync = CloudSync<MyMetadata, MyData>(
-  fetchLocalMetadataList: () async => localMetadataList,
-  fetchCloudMetadataList: () async => cloudMetadataList,
-  fetchLocalDetail: (metadata) async => localStorage[metadata.id]!,
-  fetchCloudDetail: (metadata) async => cloudStorage[metadata.id]!,
-  saveToLocal: (metadata, data) async => localStorage[metadata.id] = data,
-  saveToCloud: (metadata, data) async => cloudStorage[metadata.id] = data,
+// Create your CloudSync instance
+final cloudSync = CloudSync<FileMetadata, FileData>.fromAdapters(
+  LocalStorageAdapter(), // Just an example
+  GoogleDriveAppdataAdapter(), // Just an example
 );
 
-// Manual sync
-await cloudSync.sync(progressCallback: (state) {
-  print('Sync state: ${state.runtimeType}');
-});
-
-// Start auto-sync every 10 minutes
-cloudSync.autoSync(
-  interval: Duration(minutes: 10),
+// Run a sync operation
+await cloudSync.sync(
   progressCallback: (state) {
-    print('Auto-sync state: ${state.runtimeType}');
+    if (state is SyncCompleted) {
+      print('Sync completed successfully!');
+    } else if (state is SyncError) {
+      print('Error: ${state.error}');
+    }
   },
 );
 
-// Stop auto-sync
-cloudSync.stopAutoSync();
+// Start automatic syncing every 5 minutes
+cloudSync.autoSync(
+  interval: Duration(minutes: 5),
+  progressCallback: handleSyncState,
+);
 ```
 
-### Adapter-Based Approach
+## Core Concepts
+
+### Metadata-Based Sync
+
+CloudSync uses metadata (like modification timestamps) to determine which items need synchronization. This approach is:
+
+- **Efficient** - Only transfers changed data
+- **Reliable** - Handles conflicts based on "latest wins" strategy
+- **Flexible** - Works with any data type that can be tracked with metadata
+
+### Sync Process Flow
+
+1. **Metadata Collection** - Gather metadata from both sources
+2. **Difference Detection** - Compare timestamps to find outdated/missing items
+3. **Data Transfer** - Move data in both directions as needed
+4. **State Reporting** - Report progress through callback events
+
+## Implementation Options
+
+### 1. Using Adapters (Recommended)
+
+Create adapters by implementing the `SyncAdapter` interface:
 
 ```dart
-// Create your adapters
-class LocalAdapter extends SyncAdapter<MyMetadata, MyData> {
-  @override
-  Future<List<MyMetadata>> fetchMetadataList() async => /* implementation */;
+// Define your metadata and data models
+class NoteMetadata extends SyncMetadata {
+  final String title;
   
-  @override
-  Future<MyData> fetchDetail(MyMetadata metadata) async => /* implementation */;
-  
-  @override
-  Future<void> save(MyMetadata metadata, MyData detail) async => /* implementation */;
+  NoteMetadata({
+    required super.id,
+    required super.modifiedAt,
+    required this.title,
+  });
 }
 
-class CloudAdapter extends SyncAdapter<MyMetadata, MyData> {
-  // Similar implementation
+class Note {
+  final String content;
+  final List<String> tags;
+  
+  Note({required this.content, this.tags = const []});
 }
 
-// Create CloudSync using adapters
+// Create local adapter
+class LocalAdapter implements SyncAdapter<NoteMetadata, Note> {
+  final Map<String, Note> _notes = {};
+  final Map<String, NoteMetadata> _metadata = {};
+  
+  @override
+  Future<List<NoteMetadata>> fetchMetadataList() async {
+    return _metadata.values.toList();
+  }
+
+  @override
+  Future<Note> fetchDetail(NoteMetadata metadata) async {
+    return _notes[metadata.id] ?? 
+        throw Exception('Note not found: ${metadata.id}');
+  }
+
+  @override
+  Future<void> save(NoteMetadata metadata, Note detail) async {
+    _metadata[metadata.id] = metadata;
+    _notes[metadata.id] = detail;
+  }
+}
+
+// Create cloud adapter
+class CloudAdapter implements SyncAdapter<NoteMetadata, Note> {
+  // Similar implementation for cloud storage
+  // ...
+}
+
+// Then create your sync instance
 final cloudSync = CloudSync.fromAdapters(
   LocalAdapter(),
   CloudAdapter(),
 );
 ```
 
-## API Overview
+### 2. Using Function Injection
 
-### `CloudSync<M, D>` Constructor
-
-```dart
-CloudSync({
-  required FetchMetadataList<M> fetchLocalMetadataList,
-  required FetchMetadataList<M> fetchCloudMetadataList,
-  required FetchDetail<M, D> fetchLocalDetail,
-  required FetchDetail<M, D> fetchCloudDetail,
-  required SaveDetail<M, D> saveToLocal,
-  required SaveDetail<M, D> saveToCloud,
-});
-```
-
-### Factory Constructor
+Provide individual functions for each operation:
 
 ```dart
-CloudSync.fromAdapters(
-  SyncAdapter<M, D> localAdapter,
-  SyncAdapter<M, D> cloudAdapter,
+final cloudSync = CloudSync<NoteMetadata, Note>(
+  fetchLocalMetadataList: () async => await localDb.getAllMetadata(),
+  fetchCloudMetadataList: () async => await api.fetchAllMetadata(),
+  fetchLocalDetail: (meta) async => await localDb.getNote(meta.id),
+  fetchCloudDetail: (meta) async => await api.fetchNote(meta.id),
+  saveToLocal: (meta, note) async => await localDb.saveNote(meta.id, note),
+  saveToCloud: (meta, note) async => await api.uploadNote(meta.id, note),
 );
 ```
 
-### Methods
+## Advanced Features
 
-| Method | Description |
-|--------|-------------|
-| `sync()` | Executes a full sync with optional progress callback and concurrent sync option. |
-| `autoSync()` | Starts a timer to auto-sync periodically. |
-| `stopAutoSync()` | Stops the auto-sync process. |
+### Synchronization States
 
-## Type Definitions
-
-| Type | Signature | Purpose |
-|------|-----------|---------|
-| `FetchMetadataList<M>` | `Future<List<M>> Function()` | Fetches list of metadata |
-| `FetchDetail<M, D>` | `Future<D> Function(M)` | Retrieves data using metadata |
-| `SaveDetail<M, D>` | `Future<void> Function(M, D)` | Writes data to storage |
-| `SyncProgressCallback<M>` | `void Function(SyncState<M>)` | Reports progress updates |
-
-## Models
-
-### `SyncMetadata`
+Track sync progress with the sealed `SyncState` class hierarchy:
 
 ```dart
-class SyncMetadata {
-  final String id;
-  final DateTime modifiedAt;
-  final bool isDeleted;
-
-  SyncMetadata({
-    required this.id,
-    required this.modifiedAt,
-    this.isDeleted = false,
-  });
-  
-  // Additional utility methods:
-  // copyWith(), toMap(), fromMap(), toJson(), fromJson()
-}
-```
-
-Extend this class to include more fields (e.g., `name`, `size`, etc.) as needed.
-
-### `SyncAdapter`
-
-```dart
-abstract class SyncAdapter<M extends SyncMetadata, D> {
-  Future<List<M>> fetchMetadataList();
-  Future<D> fetchDetail(M metadata);
-  Future<void> save(M metadata, D detail);
-}
-```
-
-## Sync Lifecycle States
-
-`SyncState<M>` is the base class for all sync progress reporting. Use it to show progress in UI or for logging.
-
-| State | Description |
-|-------|-------------|
-| `InProgress` | A sync is already ongoing and cannot start a new one. |
-| `FetchingLocalMetadata` | Fetching metadata from the local source. |
-| `FetchingCloudMetadata` | Fetching metadata from the cloud source. |
-| `ScanningCloud` | Comparing local data against cloud data to find differences. |
-| `ScanningLocal` | Comparing cloud data against local data to find differences. |
-| `SavingToCloud` | Writing a specific data/metadata pair to the cloud. |
-| `SavedToCloud` | Successfully wrote data to the cloud. |
-| `SavingToLocal` | Writing a specific data/metadata pair to local storage. |
-| `SavedToLocal` | Successfully wrote data to local storage. |
-| `SyncCompleted` | Sync finished without errors. |
-| `SyncError` | Sync failed with an error. |
-
-Each state can be used for monitoring or UI updates.
-
-## Auto-Sync
-
-Automatically sync data at regular intervals.
-
-### Start
-
-```dart
-cloudSync.autoSync(
-  interval: Duration(minutes: 15),
+cloudSync.sync(
   progressCallback: (state) {
-    print('Auto-sync: ${state.runtimeType}');
+    switch (state) {
+      case FetchingLocalMetadata():
+        showProgressIndicator('Reading local data...');
+      case SavingToCloud(var metadata):
+        showProgressIndicator('Uploading ${metadata.name}...');
+      case SyncCompleted():
+        showSuccess('Sync completed!');
+      case SyncError(var error, var stack):
+        showError('Sync failed: $error');
+      // Handle other states...
+    }
   },
 );
 ```
 
-### Stop
+### Concurrent Synchronization
+
+Scanning and updating local and cloud parallelly via `Future.wait`:
 
 ```dart
+await cloudSync.sync(
+  useConcurrentSync: true,
+  progressCallback: handleSyncProgress,
+);
+```
+
+### Auto-Sync with Customization
+
+```dart
+// Start auto-sync
+cloudSync.autoSync(
+  interval: Duration(minutes: 10),
+  progressCallback: (state) {
+    // Handle sync states
+  },
+);
+
+// Stop auto-sync (e.g., when app goes to background)
 cloudSync.stopAutoSync();
 ```
 
-> If a sync is already running when the timer fires, the cycle will be skipped and `InProgress` will be reported.
+## Creating Custom Models
 
-## Example Custom Types
-
-You can define your own metadata and data models like this:
+### 1. Extend SyncMetadata
 
 ```dart
-class MyMetadata extends SyncMetadata {
-  final String name;
-  MyMetadata({required super.id, required super.modifiedAt, required this.name});
-}
+class DocumentMetadata extends SyncMetadata {
+  final String title;
+  final int version;
 
-class MyData {
-  final String content;
-  MyData(this.content);
+  DocumentMetadata({
+    required super.id,
+    required super.modifiedAt,
+    required this.title,
+    this.version = 1,
+    super.isDeleted = false,
+  });
+
+  @override
+  DocumentMetadata copyWith({
+    String? id,
+    DateTime? modifiedAt,
+    bool? isDeleted,
+    String? title,
+    int? version,
+  }) {
+    return DocumentMetadata(
+      id: id ?? this.id,
+      modifiedAt: modifiedAt ?? this.modifiedAt,
+      isDeleted: isDeleted ?? this.isDeleted,
+      title: title ?? this.title,
+      version: version ?? this.version,
+    );
+  }
+
+  // Implement toMap, fromMap, etc.
 }
 ```
 
-## Sync Implementation Details
+### 2. Define Your Data Model
 
-CloudSync performs synchronization in the following order:
+```dart
+class Document {
+  final String content;
+  final List<String> tags;
 
-1. Fetch metadata from local and cloud sources
-2. Compare metadata to identify differences
-3. Upload missing or newer local files to the cloud
-4. Download missing or newer cloud files to local storage
-5. Report completion or errors
+  Document({
+    required this.content,
+    this.tags = const [],
+  });
+  
+  // Your serialization methods
+}
+```
 
-Each step is reported through the `progressCallback` to provide visibility into the sync process.
+## API Reference
 
-The `useConcurrentSync` parameter allows for parallel processing of local and cloud data synchronization when set to `true`.
+### CloudSync Class
+
+| Method | Description |
+|--------|-------------|
+| `sync()` | Performs full synchronization between local and cloud |
+| `autoSync()` | Starts periodic automatic synchronization |
+| `stopAutoSync()` | Stops automatic synchronization |
+
+### SyncState Events
+
+| State | Description |
+|-------|-------------|
+| `InProgress` | A sync operation is already running |
+| `FetchingLocalMetadata` | Retrieving metadata from local storage |
+| `FetchingCloudMetadata` | Retrieving metadata from cloud storage |
+| `ScanningLocal` | Analyzing cloud data for local updates |
+| `ScanningCloud` | Analyzing local data for cloud updates |
+| `SavingToLocal` | Writing data to local storage |
+| `SavedToLocal` | Successfully saved data locally |
+| `SavingToCloud` | Uploading data to cloud storage |
+| `SavedToCloud` | Successfully uploaded data to cloud |
+| `SyncCompleted` | Synchronization process completed |
+| `SyncError` | Error occurred during synchronization |
+
+## Compatibility
+
+- Works with any Flutter or Dart application
+- Storage agnostic - use with any local database and cloud service
+- Null safety compliant
 
 ## License
 
-MIT License. Use it, extend it, and contribute!
+This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Inspiration
+## Contributing
 
-Built for apps that need to keep data synchronized across devices or sessions, such as:
-
-- Note apps
-- Document managers
-- Media libraries
-- Offline-capable business tools
-
-## Contributions Welcome
-
-Found a bug or have a suggestion? PRs and issues are open and appreciated!
+Contributions are welcome! Please feel free to submit a Pull Request.
