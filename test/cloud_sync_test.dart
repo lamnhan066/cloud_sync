@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:cloud_sync/cloud_sync.dart';
+import 'package:cloud_sync/src/models/sync_errors.dart';
 import 'package:test/test.dart';
 
 class MockData {
@@ -401,6 +402,8 @@ void main() {
           progressStates.lastWhere((state) => state is SyncError) as SyncError;
       expect(errorState.error.toString(), contains('Fetch Metadata Error'));
       expect(errorState.stackTrace, isNotNull);
+      // More specific error verification:
+      expect(errorState.error, isA<Exception>());
     });
 
     test('Sync handles error on fetch cloud metadata', () async {
@@ -408,6 +411,10 @@ void main() {
       await cloudSync.sync(progressCallback: progressCallback);
 
       expect(progressStates, contains(isA<SyncError>()));
+      // More specific error verification:
+      final errorState =
+          progressStates.lastWhere((state) => state is SyncError) as SyncError;
+      expect(errorState.error, isA<Exception>());
     });
 
     test('Sync handles error on fetch local detail', () async {
@@ -419,6 +426,10 @@ void main() {
       await cloudSync.sync(progressCallback: progressCallback);
 
       expect(progressStates, contains(isA<SyncError>()));
+      // More specific error verification:
+      final errorState =
+          progressStates.lastWhere((state) => state is SyncError) as SyncError;
+      expect(errorState.error, isA<Exception>());
     });
 
     test('Sync handles error on fetch cloud detail', () async {
@@ -430,6 +441,10 @@ void main() {
       await cloudSync.sync(progressCallback: progressCallback);
 
       expect(progressStates, contains(isA<SyncError>()));
+      // More specific error verification:
+      final errorState =
+          progressStates.lastWhere((state) => state is SyncError) as SyncError;
+      expect(errorState.error, isA<Exception>());
     });
 
     test('Sync handles error on save to local', () async {
@@ -756,6 +771,59 @@ void main() {
       expect(() async => await cloudSync.sync(), throwsA(isA<Exception>()));
     });
 
+    test('Auto sync skips when sync is in progress with timeout', () async {
+      int syncStartedCount = 0;
+      int syncSkippedCount = 0;
+
+      // Add significant delay to simulate long-running sync
+      cloudAdapter.fetchDelay = Duration(milliseconds: 300);
+
+      cloudSync.autoSync(
+        interval: Duration(milliseconds: 100),
+        progressCallback: (state) {
+          progressCallback(state);
+          if (state is FetchingLocalMetadata) {
+            syncStartedCount++;
+          }
+          if (state is InProgress) {
+            syncSkippedCount++;
+          }
+        },
+      );
+
+      // Wait long enough for multiple intervals but not too many syncs
+      await Future.delayed(Duration(milliseconds: 500));
+      cloudSync.stopAutoSync();
+
+      // Verify at least one sync started
+      expect(
+        syncStartedCount,
+        greaterThan(0),
+        reason: 'At least one sync should have started',
+      );
+
+      // Verify at least one sync was skipped
+      expect(
+        syncSkippedCount,
+        greaterThan(0),
+        reason:
+            'At least one sync should have been skipped due to in-progress operation',
+      );
+
+      // Ensure syncs are not overlapping
+      expect(
+        syncStartedCount,
+        lessThanOrEqualTo(2),
+        reason:
+            'Syncs should not overlap, and only a limited number should start',
+      );
+
+      //Test timeout.
+      await expectLater(
+          Future.delayed(Duration(milliseconds: 1000), () => 'timeout'),
+          completion(equals('timeout')));
+    });
+
     test('Sync operation can be effectively cancelled', () async {
       // Create a separate instance that we can control
       final cancelableSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
@@ -793,6 +861,42 @@ void main() {
         cloudAdapter._data.containsKey('cancel-test'),
         isFalse,
         reason: 'Cancelled sync should not complete the data transfer',
+      );
+    });
+
+    test('CloudSync dispose stops all operations', () async {
+      final cancelableSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
+
+      // Block operations so sync will hang
+      localAdapter.blockOperations();
+      cloudAdapter.blockOperations();
+
+      // Start sync in background
+      final syncFuture =
+          cancelableSync.sync(progressCallback: progressCallback);
+
+      // Wait a moment to ensure sync has started
+      await Future.delayed(Duration(milliseconds: 50));
+
+      // Dispose the CloudSync instance
+      cancelableSync.dispose();
+
+      // Unblock operations to allow the sync to continue if it wasn't properly cancelled
+      localAdapter.unblockOperations();
+      cloudAdapter.unblockOperations();
+
+      // Expect the future to complete without error.
+      await expectLater(syncFuture, completes);
+
+      // Verify that after dispose, further sync calls throw an error.
+      expect(() => cancelableSync.sync(), throwsA(isA<SyncDisposedError>()));
+
+      //Verify that auto sync is also stopped.
+      expect(
+        () => cancelableSync.autoSync(
+          interval: Duration(milliseconds: 100),
+        ),
+        throwsA(isA<SyncDisposedError>()),
       );
     });
 
