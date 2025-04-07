@@ -122,10 +122,12 @@ class CloudSync<M extends SyncMetadata, D> {
     SyncProgressCallback<M>? progressCallback,
     bool useConcurrentSync = false,
   }) async {
-    void progress(SyncState<M> Function() state) {
+    bool progress(SyncState<M> Function() state) {
       if (progressCallback != null) {
         progressCallback(state());
+        return true;
       }
+      return false;
     }
 
     if (_isSyncInProgress) {
@@ -160,8 +162,10 @@ class CloudSync<M extends SyncMetadata, D> {
               final localFile = await fetchLocalDetail(localMetadata);
               await saveToCloud(localMetadata, localFile);
               progress(() => SavedToCloud(localMetadata));
-            } catch (e, stackTrace) {
-              progress(() => SyncError(e, stackTrace));
+            } catch (error, stackTrace) {
+              if (!progress(() => SyncError(error, stackTrace))) {
+                rethrow;
+              }
             }
           }
         }
@@ -180,8 +184,10 @@ class CloudSync<M extends SyncMetadata, D> {
               final cloudFile = await fetchCloudDetail(cloudMetadata);
               await saveToLocal(cloudMetadata, cloudFile);
               progress(() => SavedToLocal(cloudMetadata));
-            } catch (e, stackTrace) {
-              progress(() => SyncError(e, stackTrace));
+            } catch (error, stackTrace) {
+              if (!progress(() => SyncError(error, stackTrace))) {
+                rethrow;
+              }
             }
           }
         }
@@ -196,16 +202,13 @@ class CloudSync<M extends SyncMetadata, D> {
         await processLocalSync();
         await processCloudSync();
       }
-
-      progress(() => SyncCompleted());
     } catch (error, stackTrace) {
-      if (progressCallback != null) {
-        progressCallback(SyncError(error, stackTrace));
-      } else {
+      if (!progress(() => SyncError(error, stackTrace))) {
         rethrow;
       }
     } finally {
       _isSyncInProgress = false;
+      progress(() => SyncCompleted());
     }
   }
 }
