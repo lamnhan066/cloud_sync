@@ -139,7 +139,8 @@ void main() {
     setUp(() {
       localAdapter = MockSyncAdapter();
       cloudAdapter = MockSyncAdapter();
-      cloudSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
+      cloudSync =
+          CloudSync.fromAdapters(local: localAdapter, cloud: cloudAdapter);
       progressStates.clear();
     });
 
@@ -820,7 +821,8 @@ void main() {
 
     test('Sync operation can be effectively cancelled', () async {
       // Create a separate instance that we can control
-      final cancelableSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
+      final cancelableSync =
+          CloudSync.fromAdapters(local: localAdapter, cloud: cloudAdapter);
 
       // Add test data that needs syncing
       await localAdapter.save(
@@ -859,7 +861,8 @@ void main() {
     });
 
     test('CloudSync dispose stops all operations', () async {
-      final cancelableSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
+      final cancelableSync =
+          CloudSync.fromAdapters(local: localAdapter, cloud: cloudAdapter);
 
       // Block operations so sync will hang
       localAdapter.blockOperations();
@@ -908,8 +911,10 @@ void main() {
         data,
       );
 
-      final localFirstSync =
-          CloudSync.fromAdapters(localFirstAdapter1, localFirstAdapter2);
+      final localFirstSync = CloudSync.fromAdapters(
+        local: localFirstAdapter1,
+        cloud: localFirstAdapter2,
+      );
       await localFirstSync.sync();
 
       // Setup for second approach: cloud sync first
@@ -920,8 +925,10 @@ void main() {
         data,
       );
 
-      final cloudFirstSync =
-          CloudSync.fromAdapters(cloudFirstAdapter1, cloudFirstAdapter2);
+      final cloudFirstSync = CloudSync.fromAdapters(
+        local: cloudFirstAdapter1,
+        cloud: cloudFirstAdapter2,
+      );
       await cloudFirstSync.sync();
 
       // Both approaches should result in the data being in both places

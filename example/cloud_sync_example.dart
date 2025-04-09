@@ -67,7 +67,8 @@ void main() async {
 
   // Initialize CloudSync with local and cloud adapters
   // and set up the sync process.
-  final cloudSync = CloudSync.fromAdapters(localAdapter, cloudAdapter);
+  final cloudSync =
+      CloudSync.fromAdapters(local: localAdapter, cloud: cloudAdapter);
 
   // Add some data to local and cloud.
   final localMetadata = SyncMetadata(id: '1', modifiedAt: DateTime.now());
