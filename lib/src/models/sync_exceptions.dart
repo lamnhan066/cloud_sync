@@ -5,7 +5,4 @@ class SyncCancelledException implements Exception {
   /// This exception can be used to indicate that a sync process was intentionally
   /// stopped or interrupted before completion.
   const SyncCancelledException();
-
-  @override
-  String toString() => 'Sync operation was cancelled';
 }
