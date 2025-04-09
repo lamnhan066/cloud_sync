@@ -956,4 +956,106 @@ void main() {
       );
     });
   });
+
+  group('SyncMetadataSerialization Extension Tests', () {
+    test('fromJson creates SyncMetadata from valid JSON string', () {
+      const jsonString = '''
+      {
+        "id": "123",
+        "modifiedAt": "2023-01-01T12:00:00.000Z",
+        "isDeleted": true
+      }
+      ''';
+
+      final metadata = SyncMetadataDeserialization.fromJson(jsonString);
+
+      expect(metadata.id, '123');
+      expect(metadata.modifiedAt, DateTime.parse('2023-01-01T12:00:00.000Z'));
+      expect(metadata.isDeleted, isTrue);
+    });
+
+    test('fromJson handles missing isDeleted field gracefully', () {
+      const jsonString = '''
+      {
+        "id": "123",
+        "modifiedAt": "2023-01-01T12:00:00.000Z"
+      }
+      ''';
+
+      final metadata = SyncMetadataDeserialization.fromJson(jsonString);
+
+      expect(metadata.id, '123');
+      expect(metadata.modifiedAt, DateTime.parse('2023-01-01T12:00:00.000Z'));
+      expect(metadata.isDeleted, isFalse);
+    });
+
+    test('fromMap creates SyncMetadata from valid Map', () {
+      final map = {
+        'id': '123',
+        'modifiedAt': '2023-01-01T12:00:00.000Z',
+        'isDeleted': true,
+      };
+
+      final metadata = SyncMetadataDeserialization.fromMap(map);
+
+      expect(metadata.id, '123');
+      expect(metadata.modifiedAt, DateTime.parse('2023-01-01T12:00:00.000Z'));
+      expect(metadata.isDeleted, isTrue);
+    });
+
+    test('fromMap handles missing isDeleted field gracefully', () {
+      final map = {
+        'id': '123',
+        'modifiedAt': '2023-01-01T12:00:00.000Z',
+      };
+
+      final metadata = SyncMetadataDeserialization.fromMap(map);
+
+      expect(metadata.id, '123');
+      expect(metadata.modifiedAt, DateTime.parse('2023-01-01T12:00:00.000Z'));
+      expect(metadata.isDeleted, isFalse);
+    });
+
+    test('toJson converts SyncMetadata to JSON string', () {
+      final metadata = SyncMetadata(
+        id: '123',
+        modifiedAt: DateTime.parse('2023-01-01T12:00:00.000Z'),
+        isDeleted: true,
+      );
+
+      final jsonString = metadata.toJson();
+
+      expect(
+        jsonString,
+        '{"id":"123","modifiedAt":"2023-01-01T12:00:00.000Z","isDeleted":true}',
+      );
+    });
+
+    test('toMap converts SyncMetadata to Map', () {
+      final metadata = SyncMetadata(
+        id: '123',
+        modifiedAt: DateTime.parse('2023-01-01T12:00:00.000Z'),
+        isDeleted: true,
+      );
+
+      final map = metadata.toMap();
+
+      expect(map['id'], '123');
+      expect(map['modifiedAt'], '2023-01-01T12:00:00.000Z');
+      expect(map['isDeleted'], isTrue);
+    });
+
+    test('toMap handles isDeleted default value correctly', () {
+      final metadata = SyncMetadata(
+        id: '123',
+        modifiedAt: DateTime.parse('2023-01-01T12:00:00.000Z'),
+      );
+
+      final map = metadata.toMap();
+
+      expect(map['id'], '123');
+      expect(map['modifiedAt'], '2023-01-01T12:00:00.000Z');
+      expect(map['isDeleted'], isFalse);
+    });
+  });
 }
