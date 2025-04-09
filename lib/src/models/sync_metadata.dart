@@ -1,28 +1,30 @@
-/// A model class representing metadata for synchronization.
+/// A model class representing metadata used for synchronization.
 ///
-/// This class holds information about an entity's unique identifier,
-/// the timestamp of the last modification, and whether the entity
-/// has been deleted. It includes utility methods for creating instances,
-/// serialization, and deserialization.
+/// This class encapsulates information about an entity's unique identifier,
+/// the timestamp of its last modification, and its deletion status. It provides
+/// utility methods for creating instances, as well as for serialization and
+/// deserialization.
 class SyncMetadata {
-  /// Creates a new instance of [SyncMetadata].
+  /// Constructs a new instance of [SyncMetadata].
   ///
-  /// [id] is the unique identifier for the metadata.
-  /// [modifiedAt] is the timestamp of the last modification.
-  /// [isDeleted] indicates whether the metadata has been marked as deleted.
-  /// By default, [isDeleted] is set to `false`.
+  /// - [id]: A unique identifier for the entity.
+  /// - [modifiedAt]: The timestamp indicating when the entity was last modified.
+  /// - [isDeleted]: A flag indicating whether the entity has been marked as deleted.
+  ///   Defaults to `false` if not specified.
   const SyncMetadata({
     required this.id,
     required this.modifiedAt,
     this.isDeleted = false,
   });
 
-  /// The unique identifier for the metadata.
+  /// A unique identifier for the entity.
   final String id;
 
-  /// The timestamp of the last modification.
+  /// The timestamp indicating the last modification of the entity.
   final DateTime modifiedAt;
 
-  /// Indicates whether the metadata has been marked as deleted.
+  /// A flag indicating whether the entity has been marked as deleted.
+  ///
+  /// If `true`, the entity is considered deleted. Defaults to `false`.
   final bool isDeleted;
 }
