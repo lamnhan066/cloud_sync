@@ -40,22 +40,25 @@ class CloudSync<M extends SyncMetadata, D> {
     required this.saveToCloud,
   });
 
-  /// Creates a [CloudSync] instance from the given [SyncAdapter]s.
+  /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
   ///
-  /// This factory simplifies creating a [CloudSync] by accepting adapters
-  /// for local and cloud storage. Each adapter supplies the necessary
-  /// fetch and save functions for synchronization.
-  factory CloudSync.fromAdapters(
-    SyncAdapter<M, D> localAdapter,
-    SyncAdapter<M, D> cloudAdapter,
-  ) {
+  /// This factory method simplifies the creation of a [CloudSync] instance
+  /// by accepting adapters for both local and cloud storage. Each adapter
+  /// provides the required fetch and save functions needed for synchronization.
+  ///
+  /// - [local]: The adapter for local storage.
+  /// - [cloud]: The adapter for cloud storage.
+  factory CloudSync.fromAdapters({
+    required SyncAdapter<M, D> local,
+    required SyncAdapter<M, D> cloud,
+  }) {
     return CloudSync<M, D>(
-      fetchLocalMetadataList: localAdapter.fetchMetadataList,
-      fetchCloudMetadataList: cloudAdapter.fetchMetadataList,
-      fetchLocalDetail: localAdapter.fetchDetail,
-      fetchCloudDetail: cloudAdapter.fetchDetail,
-      saveToLocal: localAdapter.save,
-      saveToCloud: cloudAdapter.save,
+      fetchLocalMetadataList: local.fetchMetadataList,
+      fetchCloudMetadataList: cloud.fetchMetadataList,
+      fetchLocalDetail: local.fetchDetail,
+      fetchCloudDetail: cloud.fetchDetail,
+      saveToLocal: local.save,
+      saveToCloud: cloud.save,
     );
   }
 
