@@ -1,9 +1,7 @@
 /// A model class representing metadata used for synchronization.
 ///
 /// This class encapsulates information about an entity's unique identifier,
-/// the timestamp of its last modification, and its deletion status. It provides
-/// utility methods for creating instances, as well as for serialization and
-/// deserialization.
+/// the timestamp of its last modification, and its deletion status.
 class SyncMetadata {
   /// Constructs a new instance of [SyncMetadata].
   ///
