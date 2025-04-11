@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:cloud_sync/cloud_sync.dart';
 import 'package:test/test.dart';
@@ -954,6 +955,68 @@ void main() {
         cloudFirstAdapter2._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(timestamp.millisecondsSinceEpoch),
       );
+    });
+  });
+
+  group('SerializableSyncMetadata', () {
+    const testId = 'abc123';
+    final testDate = DateTime.parse('2024-04-10T12:00:00.000Z');
+    const testIsDeleted = true;
+
+    final testMetadata = SerializableSyncMetadata(
+      id: testId,
+      modifiedAt: testDate,
+      isDeleted: testIsDeleted,
+    );
+
+    test('toMap should return correct map', () {
+      final map = testMetadata.toMap();
+
+      expect(map, {
+        'id': testId,
+        'modifiedAt': testDate.toIso8601String(),
+        'isDeleted': testIsDeleted,
+      });
+    });
+
+    test('fromMap should return equivalent instance', () {
+      final map = {
+        'id': testId,
+        'modifiedAt': testDate.toIso8601String(),
+        'isDeleted': testIsDeleted,
+      };
+
+      final fromMap = SerializableSyncMetadata.fromMap(map);
+
+      expect(fromMap.id, testMetadata.id);
+      expect(fromMap.modifiedAt, testMetadata.modifiedAt);
+      expect(fromMap.isDeleted, testMetadata.isDeleted);
+    });
+
+    test('toJson should return valid JSON string', () {
+      final jsonStr = testMetadata.toJson();
+
+      final expectedJson = json.encode({
+        'id': testId,
+        'modifiedAt': testDate.toIso8601String(),
+        'isDeleted': testIsDeleted,
+      });
+
+      expect(jsonStr, expectedJson);
+    });
+
+    test('fromJson should return equivalent instance', () {
+      final jsonString = json.encode({
+        'id': testId,
+        'modifiedAt': testDate.toIso8601String(),
+        'isDeleted': testIsDeleted,
+      });
+
+      final fromJson = SerializableSyncMetadata.fromJson(jsonString);
+
+      expect(fromJson.id, testMetadata.id);
+      expect(fromJson.modifiedAt, testMetadata.modifiedAt);
+      expect(fromJson.isDeleted, testMetadata.isDeleted);
     });
   });
 }
