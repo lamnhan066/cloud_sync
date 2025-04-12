@@ -177,11 +177,11 @@ void main() {
 
       // Verify expected state sequence
       expect(progressStates, [
-        isA<FetchingLocalMetadata>(),
-        isA<FetchingCloudMetadata>(),
-        isA<ScanningLocal>(),
-        isA<ScanningCloud>(),
-        isA<SyncCompleted>(),
+        isA<FetchingLocalMetadata<SyncMetadata>>(),
+        isA<FetchingCloudMetadata<SyncMetadata>>(),
+        isA<ScanningLocal<SyncMetadata>>(),
+        isA<ScanningCloud<SyncMetadata>>(),
+        isA<SyncCompleted<SyncMetadata>>(),
       ]);
 
       expect(localAdapter.fetchMetadataCallCount, 1);
@@ -203,19 +203,19 @@ void main() {
       expect(
         progressStates,
         containsAllInOrder([
-          isA<FetchingLocalMetadata>(),
-          isA<FetchingCloudMetadata>(),
-          isA<ScanningLocal>(),
-          isA<ScanningCloud>(),
-          isA<SavingToCloud>(),
-          isA<SavedToCloud>(),
-          isA<SyncCompleted>(),
+          isA<FetchingLocalMetadata<SyncMetadata>>(),
+          isA<FetchingCloudMetadata<SyncMetadata>>(),
+          isA<ScanningLocal<SyncMetadata>>(),
+          isA<ScanningCloud<SyncMetadata>>(),
+          isA<SavingToCloud<SyncMetadata>>(),
+          isA<SavedToCloud<SyncMetadata>>(),
+          isA<SyncCompleted<SyncMetadata>>(),
         ]),
       );
 
       // Get the specific SavingToCloud state for further verification
-      final savingState =
-          progressStates.firstWhere((s) => s is SavingToCloud) as SavingToCloud;
+      final savingState = progressStates.firstWhere((s) => s is SavingToCloud)
+          as SavingToCloud<SyncMetadata>;
       expect(savingState.metadata.id, equals('1'));
     });
 
@@ -232,19 +232,19 @@ void main() {
       expect(
         progressStates,
         containsAllInOrder([
-          isA<FetchingLocalMetadata>(),
-          isA<FetchingCloudMetadata>(),
-          isA<ScanningLocal>(),
-          isA<SavingToLocal>(),
-          isA<SavedToLocal>(),
-          isA<ScanningCloud>(),
-          isA<SyncCompleted>(),
+          isA<FetchingLocalMetadata<SyncMetadata>>(),
+          isA<FetchingCloudMetadata<SyncMetadata>>(),
+          isA<ScanningLocal<SyncMetadata>>(),
+          isA<SavingToLocal<SyncMetadata>>(),
+          isA<SavedToLocal<SyncMetadata>>(),
+          isA<ScanningCloud<SyncMetadata>>(),
+          isA<SyncCompleted<SyncMetadata>>(),
         ]),
       );
 
       // Verify metadata in SavingToLocal state
-      final savingState =
-          progressStates.firstWhere((s) => s is SavingToLocal) as SavingToLocal;
+      final savingState = progressStates.firstWhere((s) => s is SavingToLocal)
+          as SavingToLocal<SyncMetadata>;
       expect(savingState.metadata.id, equals('2'));
     });
 
@@ -406,9 +406,9 @@ void main() {
       localAdapter.throwErrorOnFetchMetadata = true;
       await cloudSync.sync(progressCallback: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError>()));
-      final errorState =
-          progressStates.lastWhere((state) => state is SyncError) as SyncError;
+      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
+      final errorState = progressStates.lastWhere((state) => state is SyncError)
+          as SyncError<SyncMetadata>;
       expect(errorState.error.toString(), contains('Fetch Metadata Error'));
       expect(errorState.stackTrace, isNotNull);
       // More specific error verification:
@@ -419,10 +419,10 @@ void main() {
       cloudAdapter.throwErrorOnFetchMetadata = true;
       await cloudSync.sync(progressCallback: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError>()));
+      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       // More specific error verification:
-      final errorState =
-          progressStates.lastWhere((state) => state is SyncError) as SyncError;
+      final errorState = progressStates.lastWhere((state) => state is SyncError)
+          as SyncError<SyncMetadata>;
       expect(errorState.error, isA<Exception>());
     });
 
@@ -434,7 +434,7 @@ void main() {
       );
       await cloudSync.sync(progressCallback: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError>()));
+      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       // More specific error verification:
       final errorState =
           progressStates.lastWhere((state) => state is SyncError) as SyncError;
@@ -449,10 +449,10 @@ void main() {
       );
       await cloudSync.sync(progressCallback: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError>()));
+      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       // More specific error verification:
-      final errorState =
-          progressStates.lastWhere((state) => state is SyncError) as SyncError;
+      final errorState = progressStates.lastWhere((state) => state is SyncError)
+          as SyncError<SyncMetadata>;
       expect(errorState.error, isA<Exception>());
     });
 
@@ -468,7 +468,7 @@ void main() {
       expect(progressStates.any((state) => state is SavingToLocal), isTrue);
 
       // Check for continuous sync even after error
-      expect(progressStates.last, isA<SyncCompleted>());
+      expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
     });
 
     test('Sync handles error on save to cloud', () async {
@@ -483,7 +483,7 @@ void main() {
       expect(progressStates.any((state) => state is SavingToCloud), isTrue);
 
       // Check for continuous sync even after error
-      expect(progressStates.last, isA<SyncCompleted>());
+      expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
     });
 
     test('Auto sync calls sync at least once within given timeframe', () async {
@@ -666,42 +666,20 @@ void main() {
 
       // Verify expected progress states for concurrent sync
       expect(
-        progressStates.whereType<FetchingLocalMetadata>().length,
+        progressStates.whereType<FetchingLocalMetadata<SyncMetadata>>().length,
         1,
         reason: 'Should have exactly one FetchingLocalMetadata state',
       );
       expect(
-        progressStates.whereType<FetchingCloudMetadata>().length,
+        progressStates.whereType<FetchingCloudMetadata<SyncMetadata>>().length,
         1,
         reason: 'Should have exactly one FetchingCloudMetadata state',
       );
       expect(
-        progressStates.whereType<SyncCompleted>().length,
+        progressStates.whereType<SyncCompleted<SyncMetadata>>().length,
         1,
         reason: 'Should have exactly one SyncCompleted state',
       );
-    });
-
-    test('Direct constructor works the same as fromAdapters factory', () async {
-      // Create using direct constructor
-      final manualCloudSync = CloudSync<SyncMetadata, MockData>(
-        fetchLocalMetadataList: localAdapter.fetchMetadataList,
-        fetchCloudMetadataList: cloudAdapter.fetchMetadataList,
-        fetchLocalDetail: localAdapter.fetchDetail,
-        fetchCloudDetail: cloudAdapter.fetchDetail,
-        saveToLocal: localAdapter.save,
-        saveToCloud: cloudAdapter.save,
-      );
-
-      // Add test data
-      final localMeta =
-          SyncMetadata(id: 'direct-test', modifiedAt: DateTime.now());
-      final localData = MockData('Direct constructor test');
-      await localAdapter.save(localMeta, localData);
-
-      // Run sync and check results
-      await manualCloudSync.sync();
-      expect(cloudAdapter._data['direct-test'], equals(localData));
     });
 
     test('Sync handles empty metadata case correctly', () async {
@@ -712,7 +690,7 @@ void main() {
       await cloudSync.sync(progressCallback: progressCallback);
 
       // Should complete successfully with no errors
-      expect(progressStates.last, isA<SyncCompleted>());
+      expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
     });
 
     test('Sync with same timestamp keeps both versions when different',
@@ -769,8 +747,10 @@ void main() {
       }
 
       // Count the save operations
-      final savedToLocalCount = progressStates.whereType<SavedToLocal>().length;
-      final savedToCloudCount = progressStates.whereType<SavedToCloud>().length;
+      final savedToLocalCount =
+          progressStates.whereType<SavedToLocal<SyncMetadata>>().length;
+      final savedToCloudCount =
+          progressStates.whereType<SavedToCloud<SyncMetadata>>().length;
 
       expect(savedToLocalCount, equals(5));
       expect(savedToCloudCount, equals(5));
