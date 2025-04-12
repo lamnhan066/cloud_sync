@@ -17,7 +17,9 @@
     );
   ```
 
-- Add serialization and deserialization extensions for SyncMetadata
+- Add `SerializableSyncAdapter` with required metadata functions for improved serialization support
+- Add `SerializableSyncMetadata` class for improved serialization and deserialization
+- `cancelSync`, `stopAutoSync` and `dispose` methods are now return `Future<void>` to wait for the operations to finish
 
 ## 0.3.0
 
