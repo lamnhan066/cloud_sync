@@ -501,7 +501,7 @@ void main() {
 
       // Wait with longer timeout to ensure at least one sync happens
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      cloudSync.stopAutoSync();
+      await cloudSync.stopAutoSync();
 
       expect(
         syncCompleted,
@@ -532,13 +532,16 @@ void main() {
       final countBeforeStopping = syncCount;
 
       // Stop auto-sync
-      cloudSync.stopAutoSync();
+      final stopCompleter = Completer<void>()
+        ..complete(cloudSync.stopAutoSync());
 
       // Now unblock operations
       cloudAdapter.unblockOperations();
 
       // Wait to ensure no new syncs start
       await Future<void>.delayed(const Duration(milliseconds: 200));
+
+      await stopCompleter.future;
 
       expect(
         syncCount,
@@ -563,7 +566,7 @@ void main() {
 
       // Let it run for a bit
       await Future<void>.delayed(const Duration(milliseconds: 650));
-      cloudSync.stopAutoSync();
+      await cloudSync.stopAutoSync();
 
       // Should have about 3 sync events (at 0ms, ~200ms, ~400ms, ~600ms)
       // We're not asserting the exact count, just gathering data
@@ -581,7 +584,7 @@ void main() {
       );
 
       await Future<void>.delayed(const Duration(milliseconds: 650));
-      cloudSync.stopAutoSync();
+      await cloudSync.stopAutoSync();
 
       // Second round should have approximately twice as many events
       // We allow a range for test stability
@@ -614,7 +617,7 @@ void main() {
 
       // Wait long enough for multiple intervals but not too many syncs
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      cloudSync.stopAutoSync();
+      await cloudSync.stopAutoSync();
 
       // Verify at least one sync started
       expect(
@@ -802,7 +805,7 @@ void main() {
 
       // Wait long enough for multiple intervals but not too many syncs
       await Future<void>.delayed(const Duration(milliseconds: 500));
-      cloudSync.stopAutoSync();
+      await cloudSync.stopAutoSync();
 
       // Verify at least one sync started
       expect(
@@ -861,11 +864,14 @@ void main() {
 
       // Cancel sync operation by disposing the CloudSync instance
       // This simulates what would happen in a real app when the sync is cancelled
-      cancelableSync.dispose();
+      final cancelCompleter = Completer<void>()
+        ..complete(cancelableSync.cancelSync());
 
       // Unblock operations to allow the sync to continue if it wasn't properly cancelled
       localAdapter.unblockOperations();
       cloudAdapter.unblockOperations();
+
+      await cancelCompleter.future;
 
       // Wait for the sync future to complete
       await syncFuture;
@@ -894,11 +900,14 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
 
       // Dispose the CloudSync instance
-      cancelableSync.dispose();
+      final disposedCompleter = Completer<void>()
+        ..complete(cancelableSync.dispose());
 
       // Unblock operations to allow the sync to continue if it wasn't properly cancelled
       localAdapter.unblockOperations();
       cloudAdapter.unblockOperations();
+
+      await disposedCompleter.future;
 
       // Expect the future to complete without error.
       await expectLater(syncFuture, completes);
