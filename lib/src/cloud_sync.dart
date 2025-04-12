@@ -89,6 +89,9 @@ class CloudSync<M extends SyncMetadata, D> {
   /// Completer used to handle sync cancellation.
   Completer<void>? _cancellationCompleter;
 
+  /// Indicates whether the sync process should be cancelled.
+  bool _needToCancel = false;
+
   /// Whether this instance has been disposed.
   bool get isDisposed => _isDisposed;
   bool _isDisposed = false;
@@ -115,12 +118,12 @@ class CloudSync<M extends SyncMetadata, D> {
   /// Stops the auto-sync process.
   ///
   /// Cancels the timer and resets internal state.
-  void stopAutoSync() {
+  Future<void> stopAutoSync() async {
     _autoSyncTimer?.cancel();
     _autoSyncTimer = null;
 
     // Cancel any ongoing sync operation
-    cancelSync();
+    await cancelSync();
   }
 
   /// Initiates a full synchronization process between local and cloud storage.
@@ -154,17 +157,16 @@ class CloudSync<M extends SyncMetadata, D> {
       return false;
     }
 
-    if (_isSyncInProgress) {
-      progress(InProgress.new);
-      return;
-    }
-    _isSyncInProgress = true;
-
-    // Create a new cancellation completer for this sync operation
-    _cancellationCompleter = Completer<void>();
-
     try {
-      // Check if cancellation was requested before starting
+      if (_isSyncInProgress) {
+        progress(InProgress.new);
+        return;
+      }
+
+      _isSyncInProgress = true;
+      _cancellationCompleter = Completer<void>();
+      _needToCancel = false;
+
       _checkCancellation();
 
       progress(FetchingLocalMetadata.new);
@@ -191,8 +193,8 @@ class CloudSync<M extends SyncMetadata, D> {
           _checkCancellation();
 
           final cloudMetadata = cloudMetadataMap[localMetadata.id];
-          final isMissingOrOutdated = cloudMetadata == null ||
-              cloudMetadata.modifiedAt.isBefore(localMetadata.modifiedAt);
+          final isMissingOrOutdated =
+              _isMissingOrOutdated(cloudMetadata, localMetadata);
 
           if (isMissingOrOutdated) {
             progress(() => SavingToCloud(localMetadata));
@@ -218,8 +220,8 @@ class CloudSync<M extends SyncMetadata, D> {
           _checkCancellation();
 
           final localMetadata = localMetadataMap[cloudMetadata.id];
-          final isMissingOrOutdated = localMetadata == null ||
-              localMetadata.modifiedAt.isBefore(cloudMetadata.modifiedAt);
+          final isMissingOrOutdated =
+              _isMissingOrOutdated(localMetadata, cloudMetadata);
 
           if (isMissingOrOutdated) {
             progress(() => SavingToLocal(cloudMetadata));
@@ -252,6 +254,11 @@ class CloudSync<M extends SyncMetadata, D> {
       progress(SyncCompleted.new);
     } on SyncCancelledException {
       progress(SyncCancelled.new);
+
+      if (_cancellationCompleter != null &&
+          !_cancellationCompleter!.isCompleted) {
+        _cancellationCompleter!.complete();
+      }
     } catch (error, stackTrace) {
       if (!progress(() => SyncError(error, stackTrace))) {
         rethrow;
@@ -259,6 +266,7 @@ class CloudSync<M extends SyncMetadata, D> {
     } finally {
       _isSyncInProgress = false;
       _cancellationCompleter = null;
+      _needToCancel = false;
     }
   }
 
@@ -267,25 +275,19 @@ class CloudSync<M extends SyncMetadata, D> {
   /// This method should be called at strategic points during sync
   /// to allow for responsive cancellation.
   void _checkCancellation() {
-    if (_cancellationCompleter != null && _cancellationCompleter!.isCompleted) {
-      throw const SyncCancelledException();
-    }
-
-    if (_isDisposed) {
+    if (_needToCancel || _isDisposed) {
       throw const SyncCancelledException();
     }
   }
 
-  /// Cancels any ongoing sync operation.
-  ///
-  /// Returns true if there was an operation to cancel, false otherwise.
-  bool cancelSync() {
-    if (_cancellationCompleter != null &&
-        !_cancellationCompleter!.isCompleted) {
-      _cancellationCompleter!.complete();
-      return true;
-    }
-    return false;
+  /// Cancels any ongoing sync operation and waits until it's finished.
+  Future<void> cancelSync() async {
+    if (_needToCancel) return;
+    if (_cancellationCompleter == null) return;
+    if (_cancellationCompleter!.isCompleted) return;
+
+    _needToCancel = true;
+    await _cancellationCompleter!.future;
   }
 
   /// Disposes resources used by this instance.
@@ -298,15 +300,19 @@ class CloudSync<M extends SyncMetadata, D> {
   /// After calling this method, the instance should not be used anymore.
   /// Attempting to call methods on a disposed instance will result in
   /// a [SyncDisposedError] being thrown.
-  void dispose() {
+  Future<void> dispose() async {
     if (_isDisposed) {
       return; // Already disposed
     }
 
     // Stop auto-sync and cancel any ongoing sync
-    stopAutoSync();
+    await stopAutoSync();
 
     // Mark as disposed
     _isDisposed = true;
+  }
+
+  bool _isMissingOrOutdated(SyncMetadata? a, SyncMetadata b) {
+    return a == null || a.modifiedAt.isBefore(b.modifiedAt);
   }
 }
