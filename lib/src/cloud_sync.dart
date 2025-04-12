@@ -3,35 +3,39 @@ import 'dart:async';
 import 'package:cloud_sync/src/models/sync_adapter.dart';
 import 'package:cloud_sync/src/models/sync_errors.dart';
 import 'package:cloud_sync/src/models/sync_exceptions.dart';
-import 'package:cloud_sync/src/models/sync_metadata.dart';
 import 'package:cloud_sync/src/models/sync_state.dart';
 
-/// Fetches a list of [SyncMetadata] from a data source.
-typedef FetchMetadataList<M extends SyncMetadata> = Future<List<M>> Function();
+/// A function type that retrieves a unique identifier for a given metadata object.
+typedef GetMetadataId<M> = String Function(M metadata);
 
-/// Fetches a data object based on [SyncMetadata].
-typedef FetchDetail<M extends SyncMetadata, D> = Future<D> Function(M metadata);
+/// A function type that compares two metadata objects to determine their order.
+typedef MetadataComparator<M> = bool Function(M current, M other);
 
-/// Saves a data object to a storage location.
-typedef SaveDetail<M extends SyncMetadata, D> = Future<void> Function(
-  M metadata,
-  D detail,
-);
+/// A function type that fetches a list of metadata objects from a data source.
+typedef FetchMetadataList<M> = Future<List<M>> Function();
 
-/// Reports synchronization progress via a [SyncState].
-typedef SyncProgressCallback<M extends SyncMetadata> = void Function(
-  SyncState<M> state,
-);
+/// A function type that fetches a detailed data object based on metadata.
+typedef FetchDetail<M, D> = Future<D> Function(M metadata);
+
+/// A function type that saves a detailed data object to a storage location.
+typedef SaveDetail<M, D> = Future<void> Function(M metadata, D detail);
+
+/// A function type that reports synchronization progress via a [SyncState].
+typedef SyncProgressCallback<M> = void Function(SyncState<M> state);
 
 /// Handles synchronization between local and cloud storage.
 ///
-/// This class compares metadata from local and cloud storage and transfers
-/// missing or outdated data in both directions.
-class CloudSync<M extends SyncMetadata, D> {
+/// This class facilitates the synchronization of data between local and cloud storage
+/// by comparing metadata and transferring missing or outdated data in both directions.
+class CloudSync<M, D> {
   /// Creates a [CloudSync] instance.
   ///
-  /// Requires fetch and write functions for both local and cloud storage.
-  CloudSync({
+  /// Requires functions for fetching, comparing, and saving data for both local and cloud storage.
+  CloudSync._({
+    required this.getLocalMetadataId,
+    required this.getCloudMetadataId,
+    required this.isLocalMetadataBeforeCloud,
+    required this.isCloudMetadataBeforeLocal,
     required this.fetchLocalMetadataList,
     required this.fetchCloudMetadataList,
     required this.fetchLocalDetail,
@@ -40,7 +44,7 @@ class CloudSync<M extends SyncMetadata, D> {
     required this.saveToCloud,
   });
 
-  /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
+  /// Creates a [CloudSync] instance using the provided [SyncAdapterBase]s.
   ///
   /// This factory method simplifies the creation of a [CloudSync] instance
   /// by accepting adapters for both local and cloud storage. Each adapter
@@ -49,10 +53,14 @@ class CloudSync<M extends SyncMetadata, D> {
   /// - [local]: The adapter for local storage.
   /// - [cloud]: The adapter for cloud storage.
   factory CloudSync.fromAdapters({
-    required SyncAdapter<M, D> local,
-    required SyncAdapter<M, D> cloud,
+    required SyncAdapterBase<M, D> local,
+    required SyncAdapterBase<M, D> cloud,
   }) {
-    return CloudSync<M, D>(
+    return CloudSync<M, D>._(
+      getLocalMetadataId: local.getMetadataId,
+      getCloudMetadataId: cloud.getMetadataId,
+      isLocalMetadataBeforeCloud: local.isCurrentMetadataBeforeOther,
+      isCloudMetadataBeforeLocal: cloud.isCurrentMetadataBeforeOther,
       fetchLocalMetadataList: local.fetchMetadataList,
       fetchCloudMetadataList: cloud.fetchMetadataList,
       fetchLocalDetail: local.fetchDetail,
@@ -61,6 +69,18 @@ class CloudSync<M extends SyncMetadata, D> {
       saveToCloud: cloud.save,
     );
   }
+
+  /// Function to get the unique identifier for local metadata.
+  final GetMetadataId<M> getLocalMetadataId;
+
+  /// Function to get the unique identifier for cloud metadata.
+  final GetMetadataId<M> getCloudMetadataId;
+
+  /// Function to determine if local metadata is newer than cloud metadata.
+  final MetadataComparator<M> isLocalMetadataBeforeCloud;
+
+  /// Function to determine if cloud metadata is newer than local metadata.
+  final MetadataComparator<M> isCloudMetadataBeforeLocal;
 
   /// Fetches metadata from local storage.
   final FetchMetadataList<M> fetchLocalMetadataList;
@@ -108,8 +128,10 @@ class CloudSync<M extends SyncMetadata, D> {
       throw SyncDisposedError.withMethodName('autoSync()');
     }
 
+    // Cancel any existing auto-sync timer before starting a new one.
     _autoSyncTimer?.cancel();
 
+    // Start a periodic timer to trigger synchronization at the specified interval.
     _autoSyncTimer = Timer.periodic(interval, (_) async {
       await sync(progressCallback: progressCallback);
     });
@@ -122,7 +144,7 @@ class CloudSync<M extends SyncMetadata, D> {
     _autoSyncTimer?.cancel();
     _autoSyncTimer = null;
 
-    // Cancel any ongoing sync operation
+    // Cancel any ongoing sync operation.
     await cancelSync();
   }
 
@@ -149,6 +171,7 @@ class CloudSync<M extends SyncMetadata, D> {
       throw SyncDisposedError.withMethodName('sync()');
     }
 
+    // Helper function to report progress if a callback is provided.
     bool progress(SyncState<M> Function() state) {
       if (progressCallback != null) {
         progressCallback(state());
@@ -158,6 +181,7 @@ class CloudSync<M extends SyncMetadata, D> {
     }
 
     try {
+      // Prevent multiple sync operations from running simultaneously.
       if (_isSyncInProgress) {
         progress(InProgress.new);
         return;
@@ -169,32 +193,40 @@ class CloudSync<M extends SyncMetadata, D> {
 
       _checkCancellation();
 
+      // Fetch metadata from local storage.
       progress(FetchingLocalMetadata.new);
       final localMetadataList = await fetchLocalMetadataList();
 
       _checkCancellation();
 
+      // Map local metadata by their unique identifiers.
       final localMetadataMap = {
-        for (final metadata in localMetadataList) metadata.id: metadata,
+        for (final metadata in localMetadataList)
+          getLocalMetadataId(metadata): metadata,
       };
 
+      // Fetch metadata from cloud storage.
       progress(FetchingCloudMetadata.new);
       final cloudMetadataList = await fetchCloudMetadataList();
 
       _checkCancellation();
 
+      // Map cloud metadata by their unique identifiers.
       final cloudMetadataMap = {
-        for (final metadata in cloudMetadataList) metadata.id: metadata,
+        for (final metadata in cloudMetadataList)
+          getCloudMetadataId(metadata): metadata,
       };
 
+      // Process synchronization from local to cloud.
       Future<void> processCloudSync() async {
         progress(ScanningCloud.new);
         for (final localMetadata in localMetadataList) {
           _checkCancellation();
 
-          final cloudMetadata = cloudMetadataMap[localMetadata.id];
-          final isMissingOrOutdated =
-              _isMissingOrOutdated(cloudMetadata, localMetadata);
+          final cloudMetadata =
+              cloudMetadataMap[getLocalMetadataId(localMetadata)];
+          final isMissingOrOutdated = cloudMetadata == null ||
+              isCloudMetadataBeforeLocal(cloudMetadata, localMetadata);
 
           if (isMissingOrOutdated) {
             progress(() => SavingToCloud(localMetadata));
@@ -214,14 +246,16 @@ class CloudSync<M extends SyncMetadata, D> {
         }
       }
 
+      // Process synchronization from cloud to local.
       Future<void> processLocalSync() async {
         progress(ScanningLocal.new);
         for (final cloudMetadata in cloudMetadataList) {
           _checkCancellation();
 
-          final localMetadata = localMetadataMap[cloudMetadata.id];
-          final isMissingOrOutdated =
-              _isMissingOrOutdated(localMetadata, cloudMetadata);
+          final localMetadata =
+              localMetadataMap[getCloudMetadataId(cloudMetadata)];
+          final isMissingOrOutdated = localMetadata == null ||
+              isLocalMetadataBeforeCloud(localMetadata, cloudMetadata);
 
           if (isMissingOrOutdated) {
             progress(() => SavingToLocal(cloudMetadata));
@@ -241,6 +275,7 @@ class CloudSync<M extends SyncMetadata, D> {
         }
       }
 
+      // Run synchronization tasks concurrently or sequentially based on the flag.
       if (useConcurrentSync) {
         await Future.wait([
           processLocalSync(),
@@ -293,9 +328,9 @@ class CloudSync<M extends SyncMetadata, D> {
   /// Disposes resources used by this instance.
   ///
   /// This method:
-  /// 1. Stops any auto-sync processes
-  /// 2. Cancels any ongoing synchronization
-  /// 3. Marks the instance as disposed
+  /// 1. Stops any auto-sync processes.
+  /// 2. Cancels any ongoing synchronization.
+  /// 3. Marks the instance as disposed.
   ///
   /// After calling this method, the instance should not be used anymore.
   /// Attempting to call methods on a disposed instance will result in
@@ -305,14 +340,10 @@ class CloudSync<M extends SyncMetadata, D> {
       return; // Already disposed
     }
 
-    // Stop auto-sync and cancel any ongoing sync
+    // Stop auto-sync and cancel any ongoing sync.
     await stopAutoSync();
 
-    // Mark as disposed
+    // Mark as disposed.
     _isDisposed = true;
-  }
-
-  bool _isMissingOrOutdated(SyncMetadata? a, SyncMetadata b) {
-    return a == null || a.modifiedAt.isBefore(b.modifiedAt);
   }
 }
