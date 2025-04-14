@@ -1,69 +1,70 @@
 import 'package:cloud_sync/cloud_sync.dart';
 
-/// Synchronization adapter for a specific data source.
+/// A base class for synchronization adapters that manage metadata.
 ///
 /// This abstract class extends [SyncAdapter] and provides default
 /// implementations for some methods. It is generic over:
-/// - [M]: A type extending [SyncMetadata], representing sync metadata.
+/// - [M]: A type that extends [SyncMetadata], representing the synchronization metadata.
 /// - [D]: A type representing the detailed data associated with the metadata.
+///
+/// Use this class as a foundation for implementing synchronization logic
+/// for data sources that require metadata management.
 abstract class SyncMetadataAdapter<M extends SyncMetadata, D>
-    implements SyncAdapter<M, D> {
-  /// Default constructor for [SyncMetadataAdapter].
-  const SyncMetadataAdapter();
+    extends SyncAdapter<M, D> {
+  /// Constructs a [SyncMetadataAdapter] with default implementations
+  /// for retrieving the unique identifier of metadata and comparing metadata.
+  const SyncMetadataAdapter()
+      : super(
+          getMetadataId: _getMetadataId,
+          isCurrentMetadataBeforeOther: _isCurrentMetadataBeforeOther,
+        );
 
-  @override
-  String getMetadataId(M metadata) {
-    return metadata.id;
-  }
+  /// Retrieves the unique identifier for the given [metadata].
+  ///
+  /// This method is used internally to uniquely identify metadata objects.
+  static String _getMetadataId(SyncMetadata metadata) => metadata.id;
 
-  @override
-  bool isCurrentMetadataBeforeOther(M current, M other) {
+  /// Compares two metadata objects to determine their order based on modification time.
+  ///
+  /// Returns `true` if [current] was modified before [other], otherwise `false`.
+  static bool _isCurrentMetadataBeforeOther(
+    SyncMetadata current,
+    SyncMetadata other,
+  ) {
     return current.modifiedAt.isBefore(other.modifiedAt);
   }
-
-  /// Fetches a list of metadata items available for synchronization.
-  ///
-  /// Returns a [Future] that resolves to a list of metadata items of type `M`.
-  @override
-  Future<List<M>> fetchMetadataList();
-
-  /// Retrieves the detailed data associated with the given [metadata].
-  ///
-  /// Returns a [Future] that resolves to a detail object of type `D`.
-  @override
-  Future<D> fetchDetail(M metadata);
-
-  /// Saves the provided [metadata] and its associated [detail] to the data source.
-  ///
-  /// Returns a [Future] that completes when the save operation is finished.
-  @override
-  Future<void> save(M metadata, D detail);
 }
 
-/// Synchronization adapter with serialization capabilities.
+/// A synchronization adapter with support for metadata serialization.
 ///
-/// This abstract class extends [SyncMetadataAdapter] and adds methods for converting
-/// metadata objects to and from JSON strings. It is generic over:
-/// - [M]: A type extending [SyncMetadata], representing sync metadata.
+/// This abstract class extends [SyncMetadataAdapter] and adds methods for
+/// converting metadata objects to and from JSON strings. It is generic over:
+/// - [M]: A type that extends [SyncMetadata], representing the synchronization metadata.
 /// - [D]: A type representing the detailed data associated with the metadata.
 ///
-/// This class is useful for scenarios where metadata needs to be serialized
-/// for storage or transmission, such as in a database or over a network.
+/// This class is particularly useful in scenarios where metadata needs to be
+/// serialized for storage (e.g., in a database) or transmission (e.g., over a network).
 abstract class SerializableSyncMetadataAdapter<M extends SyncMetadata, D>
     extends SyncMetadataAdapter<M, D> {
-  /// Default constructor for [SerializableSyncMetadataAdapter].
+  /// Constructs a [SerializableSyncMetadataAdapter] with the provided serialization functions.
   ///
-  /// - [metadataToJson]: A function that converts metadata of type `M` to a JSON string.
-  /// - [metadataFromJson]: A function that converts a JSON string to metadata of type `M`.
-  /// These functions are used for serialization and deserialization of metadata.
+  /// - [metadataToJson]: A function that converts metadata of type [M] to a JSON string.
+  /// - [metadataFromJson]: A function that converts a JSON string to metadata of type [M].
+  ///
+  /// These functions enable the serialization and deserialization of metadata,
+  /// making it easier to store or transmit metadata in a structured format.
   const SerializableSyncMetadataAdapter({
     required this.metadataToJson,
     required this.metadataFromJson,
   });
 
-  /// Function to serialize metadata to a JSON string.
+  /// A function to serialize metadata of type [M] into a JSON string.
+  ///
+  /// This function is used to convert metadata into a format suitable for storage or transmission.
   final String Function(M metadata) metadataToJson;
 
-  /// Function to deserialize metadata from a JSON string.
+  /// A function to deserialize a JSON string into metadata of type [M].
+  ///
+  /// This function is used to reconstruct metadata from its serialized JSON representation.
   final M Function(String json) metadataFromJson;
 }
