@@ -19,7 +19,7 @@ class MyData {
   String toString() => 'MyData(content: $content)';
 }
 
-class MyLocalAdapter extends SyncAdapter<SyncMetadata, MyData> {
+class MyLocalAdapter extends SyncMetadataAdapter<SyncMetadata, MyData> {
   final Map<String, MyData> _localData = {};
   final Map<String, SyncMetadata> _localMetadata = {};
 
@@ -40,7 +40,7 @@ class MyLocalAdapter extends SyncAdapter<SyncMetadata, MyData> {
   }
 }
 
-class MyCloudAdapter extends SyncAdapter<SyncMetadata, MyData> {
+class MyCloudAdapter extends SyncMetadataAdapter<SyncMetadata, MyData> {
   final Map<String, MyData> _cloudData = {};
   final Map<String, SyncMetadata> _cloudMetadata = {};
 

@@ -20,7 +20,7 @@ class MockData {
   String toString() => 'MockData(content: $content)';
 }
 
-class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
+class MockSyncAdapter extends SyncMetadataAdapter<SyncMetadata, MockData> {
   final Map<String, MockData> _data = {};
   final Map<String, SyncMetadata> _metadata = {};
   bool throwErrorOnFetchMetadata = false;
@@ -117,7 +117,7 @@ class MockSyncAdapter extends SyncAdapter<SyncMetadata, MockData> {
 }
 
 class MockSerializableSyncAdapter
-    extends SerializableSyncAdapter<SyncMetadata, MockData> {
+    extends SerializableSyncMetadataAdapter<SyncMetadata, MockData> {
   MockSerializableSyncAdapter({
     required super.metadataToJson,
     required super.metadataFromJson,
@@ -1027,7 +1027,7 @@ void main() {
   });
 
   group('SerializableSyncAdapter Tests', () {
-    late SerializableSyncAdapter<SyncMetadata, MockData> adapter;
+    late SerializableSyncMetadataAdapter<SyncMetadata, MockData> adapter;
 
     setUp(() {
       adapter = MockSerializableSyncAdapter(
