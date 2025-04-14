@@ -6,7 +6,7 @@ import 'package:cloud_sync/src/models/sync_exceptions.dart';
 import 'package:cloud_sync/src/models/sync_state.dart';
 
 /// A function type that retrieves a unique identifier for a given metadata object.
-typedef GetMetadataId<M> = FutureOr<String> Function(M metadata);
+typedef GetMetadataId<M> = String Function(M metadata);
 
 /// A function type that compares two metadata objects to determine their order.
 typedef MetadataComparator<M> = FutureOr<bool> Function(M current, M other);

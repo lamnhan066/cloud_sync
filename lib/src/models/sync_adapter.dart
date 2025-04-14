@@ -14,7 +14,7 @@ abstract class SyncAdapter<M, D> {
   ///
   /// This identifier is used to uniquely identify metadata items
   /// during the synchronization process.
-  FutureOr<String> getMetadataId(M metadata);
+  String getMetadataId(M metadata);
 
   /// Compares two metadata items to determine if the current one is older.
   ///
@@ -65,10 +65,10 @@ abstract class SerializableSyncAdapter<M, D> extends SyncAdapter<M, D> {
   /// A function that converts metadata of type `M` into a JSON string.
   ///
   /// This function is used to serialize metadata for storage or transmission.
-  final FutureOr<String> Function(M metadata) metadataToJson;
+  final String Function(M metadata) metadataToJson;
 
   /// A function that converts a JSON string back into metadata of type `M`.
   ///
   /// This function is used to deserialize metadata from a serialized format.
-  final FutureOr<M> Function(String json) metadataFromJson;
+  final M Function(String json) metadataFromJson;
 }
