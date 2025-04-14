@@ -6,19 +6,19 @@ import 'package:cloud_sync/src/models/sync_exceptions.dart';
 import 'package:cloud_sync/src/models/sync_state.dart';
 
 /// A function type that retrieves a unique identifier for a given metadata object.
-typedef GetMetadataId<M> = String Function(M metadata);
+typedef GetMetadataId<M> = FutureOr<String> Function(M metadata);
 
 /// A function type that compares two metadata objects to determine their order.
-typedef MetadataComparator<M> = bool Function(M current, M other);
+typedef MetadataComparator<M> = FutureOr<bool> Function(M current, M other);
 
 /// A function type that fetches a list of metadata objects from a data source.
-typedef FetchMetadataList<M> = Future<List<M>> Function();
+typedef FetchMetadataList<M> = FutureOr<List<M>> Function();
 
 /// A function type that fetches a detailed data object based on metadata.
-typedef FetchDetail<M, D> = Future<D> Function(M metadata);
+typedef FetchDetail<M, D> = FutureOr<D> Function(M metadata);
 
 /// A function type that saves a detailed data object to a storage location.
-typedef SaveDetail<M, D> = Future<void> Function(M metadata, D detail);
+typedef SaveDetail<M, D> = FutureOr<void> Function(M metadata, D detail);
 
 /// A function type that reports synchronization progress via a [SyncState].
 typedef SyncProgressCallback<M> = void Function(SyncState<M> state);
@@ -44,7 +44,7 @@ class CloudSync<M, D> {
     required this.saveToCloud,
   });
 
-  /// Creates a [CloudSync] instance using the provided [SyncAdapterBase]s.
+  /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
   ///
   /// This factory method simplifies the creation of a [CloudSync] instance
   /// by accepting adapters for both local and cloud storage. Each adapter
@@ -53,8 +53,8 @@ class CloudSync<M, D> {
   /// - [local]: The adapter for local storage.
   /// - [cloud]: The adapter for cloud storage.
   factory CloudSync.fromAdapters({
-    required SyncAdapterBase<M, D> local,
-    required SyncAdapterBase<M, D> cloud,
+    required SyncAdapter<M, D> local,
+    required SyncAdapter<M, D> cloud,
   }) {
     return CloudSync<M, D>._(
       getLocalMetadataId: local.getMetadataId,
@@ -226,7 +226,7 @@ class CloudSync<M, D> {
           final cloudMetadata =
               cloudMetadataMap[getLocalMetadataId(localMetadata)];
           final isMissingOrOutdated = cloudMetadata == null ||
-              isCloudMetadataBeforeLocal(cloudMetadata, localMetadata);
+              await isCloudMetadataBeforeLocal(cloudMetadata, localMetadata);
 
           if (isMissingOrOutdated) {
             progress(() => SavingToCloud(localMetadata));
@@ -255,7 +255,7 @@ class CloudSync<M, D> {
           final localMetadata =
               localMetadataMap[getCloudMetadataId(cloudMetadata)];
           final isMissingOrOutdated = localMetadata == null ||
-              isLocalMetadataBeforeCloud(localMetadata, cloudMetadata);
+              await isLocalMetadataBeforeCloud(localMetadata, cloudMetadata);
 
           if (isMissingOrOutdated) {
             progress(() => SavingToLocal(cloudMetadata));
