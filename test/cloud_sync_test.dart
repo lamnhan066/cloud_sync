@@ -173,7 +173,7 @@ void main() {
     }
 
     test('Sync completes successfully with no changes', () async {
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       // Verify expected state sequence
       expect(progressStates, [
@@ -195,7 +195,7 @@ void main() {
       final localData = MockData('Local Data');
       await localAdapter.save(localMetadata, localData);
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(cloudAdapter._data['1'], equals(localData));
       expect(cloudAdapter._metadata['1'], equals(localMetadata));
@@ -224,7 +224,7 @@ void main() {
       final cloudData = MockData('Cloud Data');
       await cloudAdapter.save(cloudMetadata, cloudData);
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(localAdapter._data['2'], equals(cloudData));
       expect(localAdapter._metadata['2'], equals(cloudMetadata));
@@ -263,7 +263,7 @@ void main() {
         MockData('New Local Data'),
       );
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(cloudAdapter._data[id]?.content, equals('New Local Data'));
 
@@ -290,7 +290,7 @@ void main() {
         MockData('New Cloud Data'),
       );
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(localAdapter._data[id]?.content, equals('New Cloud Data'));
 
@@ -324,7 +324,7 @@ void main() {
       );
 
       // Sync and verify deletion propagates to cloud
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(cloudAdapter._metadata[id]?.isDeleted, isTrue);
       expect(
@@ -356,7 +356,7 @@ void main() {
       );
 
       // Sync and verify deletion propagates to local
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(localAdapter._metadata[id]?.isDeleted, isTrue);
       expect(
@@ -394,7 +394,7 @@ void main() {
         MockData('Modified Data'),
       );
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       // Modified data should win as it has newer timestamp
       expect(localAdapter._metadata[id]?.isDeleted, isFalse);
@@ -404,7 +404,7 @@ void main() {
 
     test('Sync handles error on fetch local metadata', () async {
       localAdapter.throwErrorOnFetchMetadata = true;
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       final errorState = progressStates.lastWhere((state) => state is SyncError)
@@ -417,7 +417,7 @@ void main() {
 
     test('Sync handles error on fetch cloud metadata', () async {
       cloudAdapter.throwErrorOnFetchMetadata = true;
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       // More specific error verification:
@@ -432,7 +432,7 @@ void main() {
         SyncMetadata(id: '5', modifiedAt: DateTime.now()),
         MockData('Data'),
       );
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       // More specific error verification:
@@ -447,7 +447,7 @@ void main() {
         SyncMetadata(id: '6', modifiedAt: DateTime.now()),
         MockData('Data'),
       );
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
       // More specific error verification:
@@ -462,7 +462,7 @@ void main() {
         SyncMetadata(id: '7', modifiedAt: DateTime.now()),
         MockData('Data'),
       );
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(progressStates.any((state) => state is SyncError), isTrue);
       expect(progressStates.any((state) => state is SavingToLocal), isTrue);
@@ -477,7 +477,7 @@ void main() {
         SyncMetadata(id: '8', modifiedAt: DateTime.now()),
         MockData('Data'),
       );
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       expect(progressStates.any((state) => state is SyncError), isTrue);
       expect(progressStates.any((state) => state is SavingToCloud), isTrue);
@@ -656,7 +656,7 @@ void main() {
       await cloudAdapter.save(cloudMetadata, cloudData);
 
       await cloudSync.sync(
-        progressCallback: progressCallback,
+        progress: progressCallback,
         useConcurrentSync: true,
       );
 
@@ -687,7 +687,7 @@ void main() {
       localAdapter.reset();
       cloudAdapter.reset();
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       // Should complete successfully with no errors
       expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
@@ -708,7 +708,7 @@ void main() {
         MockData('Cloud Data'),
       );
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       // Data should remain unchanged in both directions
       expect(localAdapter._data[id]?.content, equals('Local Data'));
@@ -732,7 +732,7 @@ void main() {
         );
       }
 
-      await cloudSync.sync(progressCallback: progressCallback);
+      await cloudSync.sync(progress: progressCallback);
 
       // Verify all items were synced both ways
       for (var i = 0; i < 5; i++) {
@@ -836,8 +836,7 @@ void main() {
       cloudAdapter.blockOperations();
 
       // Start sync in background
-      final syncFuture =
-          cancelableSync.sync(progressCallback: progressCallback);
+      final syncFuture = cancelableSync.sync(progress: progressCallback);
 
       // Wait a moment to ensure sync has started
       await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -873,8 +872,7 @@ void main() {
       cloudAdapter.blockOperations();
 
       // Start sync in background
-      final syncFuture =
-          cancelableSync.sync(progressCallback: progressCallback);
+      final syncFuture = cancelableSync.sync(progress: progressCallback);
 
       // Wait a moment to ensure sync has started
       await Future<void>.delayed(const Duration(milliseconds: 50));

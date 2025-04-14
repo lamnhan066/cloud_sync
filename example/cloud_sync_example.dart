@@ -81,7 +81,7 @@ void main() async {
 
   // Perform sync
   await cloudSync.sync(
-    progressCallback: (state) {
+    progress: (state) {
       print('Sync state: ${state.runtimeType}');
     },
   );

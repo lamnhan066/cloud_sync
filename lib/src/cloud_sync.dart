@@ -133,7 +133,7 @@ class CloudSync<M, D> {
 
     // Start a periodic timer to trigger synchronization at the specified interval.
     _autoSyncTimer = Timer.periodic(interval, (_) async {
-      await sync(progressCallback: progressCallback);
+      await sync(progress: progressCallback);
     });
   }
 
@@ -156,7 +156,7 @@ class CloudSync<M, D> {
   /// 3. Uploads any missing or updated files from the local storage to the cloud.
   /// 4. Downloads any missing or updated files from the cloud to local storage.
   ///
-  /// Optionally, progress updates can be provided via the [progressCallback], which
+  /// Optionally, progress updates can be provided via the [progress], which
   /// receives a [SyncState] representing the current synchronization state.
   /// In case of an error during synchronization, the error is reported using the
   /// [SyncError] state (if the callback is provided) or rethrown to the caller.
@@ -164,7 +164,7 @@ class CloudSync<M, D> {
   /// If [useConcurrentSync] is set to `true`, the synchronization of local and cloud storage
   /// will run concurrently. Otherwise, they will be processed sequentially.
   Future<void> sync({
-    SyncProgressCallback<M>? progressCallback,
+    SyncProgressCallback<M>? progress,
     bool useConcurrentSync = false,
   }) async {
     if (_isDisposed) {
@@ -172,9 +172,9 @@ class CloudSync<M, D> {
     }
 
     // Helper function to report progress if a callback is provided.
-    bool progress(SyncState<M> Function() state) {
-      if (progressCallback != null) {
-        progressCallback(state());
+    bool updateProgress(SyncState<M> Function() state) {
+      if (progress != null) {
+        progress(state());
         return true;
       }
       return false;
@@ -183,7 +183,7 @@ class CloudSync<M, D> {
     try {
       // Prevent multiple sync operations from running simultaneously.
       if (_isSyncInProgress) {
-        progress(InProgress.new);
+        updateProgress(InProgress.new);
         return;
       }
 
@@ -194,7 +194,7 @@ class CloudSync<M, D> {
       _checkCancellation();
 
       // Fetch metadata from local storage.
-      progress(FetchingLocalMetadata.new);
+      updateProgress(FetchingLocalMetadata.new);
       final localMetadataList = await fetchLocalMetadataList();
 
       _checkCancellation();
@@ -206,7 +206,7 @@ class CloudSync<M, D> {
       };
 
       // Fetch metadata from cloud storage.
-      progress(FetchingCloudMetadata.new);
+      updateProgress(FetchingCloudMetadata.new);
       final cloudMetadataList = await fetchCloudMetadataList();
 
       _checkCancellation();
@@ -219,7 +219,7 @@ class CloudSync<M, D> {
 
       // Process synchronization from local to cloud.
       Future<void> processCloudSync() async {
-        progress(ScanningCloud.new);
+        updateProgress(ScanningCloud.new);
         for (final localMetadata in localMetadataList) {
           _checkCancellation();
 
@@ -229,16 +229,16 @@ class CloudSync<M, D> {
               await isCloudMetadataBeforeLocal(cloudMetadata, localMetadata);
 
           if (isMissingOrOutdated) {
-            progress(() => SavingToCloud(localMetadata));
+            updateProgress(() => SavingToCloud(localMetadata));
             try {
               final localFile = await fetchLocalDetail(localMetadata);
 
               _checkCancellation();
 
               await saveToCloud(localMetadata, localFile);
-              progress(() => SavedToCloud(localMetadata));
+              updateProgress(() => SavedToCloud(localMetadata));
             } catch (error, stackTrace) {
-              if (!progress(() => SyncError(error, stackTrace))) {
+              if (!updateProgress(() => SyncError(error, stackTrace))) {
                 rethrow;
               }
             }
@@ -248,7 +248,7 @@ class CloudSync<M, D> {
 
       // Process synchronization from cloud to local.
       Future<void> processLocalSync() async {
-        progress(ScanningLocal.new);
+        updateProgress(ScanningLocal.new);
         for (final cloudMetadata in cloudMetadataList) {
           _checkCancellation();
 
@@ -258,16 +258,16 @@ class CloudSync<M, D> {
               await isLocalMetadataBeforeCloud(localMetadata, cloudMetadata);
 
           if (isMissingOrOutdated) {
-            progress(() => SavingToLocal(cloudMetadata));
+            updateProgress(() => SavingToLocal(cloudMetadata));
             try {
               final cloudFile = await fetchCloudDetail(cloudMetadata);
 
               _checkCancellation();
 
               await saveToLocal(cloudMetadata, cloudFile);
-              progress(() => SavedToLocal(cloudMetadata));
+              updateProgress(() => SavedToLocal(cloudMetadata));
             } catch (error, stackTrace) {
-              if (!progress(() => SyncError(error, stackTrace))) {
+              if (!updateProgress(() => SyncError(error, stackTrace))) {
                 rethrow;
               }
             }
@@ -286,16 +286,16 @@ class CloudSync<M, D> {
         await processCloudSync();
       }
 
-      progress(SyncCompleted.new);
+      updateProgress(SyncCompleted.new);
     } on SyncCancelledException {
-      progress(SyncCancelled.new);
+      updateProgress(SyncCancelled.new);
 
       if (_cancellationCompleter != null &&
           !_cancellationCompleter!.isCompleted) {
         _cancellationCompleter!.complete();
       }
     } catch (error, stackTrace) {
-      if (!progress(() => SyncError(error, stackTrace))) {
+      if (!updateProgress(() => SyncError(error, stackTrace))) {
         rethrow;
       }
     } finally {
