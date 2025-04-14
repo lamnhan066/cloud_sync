@@ -1,4 +1,4 @@
-import 'package:cloud_sync/src/models/sync_metadata.dart';
+import 'dart:async';
 
 /// Base class for synchronization adapters for specific data sources.
 ///
@@ -6,98 +6,69 @@ import 'package:cloud_sync/src/models/sync_metadata.dart';
 /// synchronized data. It is generic over:
 /// - [M]: A type representing synchronization metadata.
 /// - [D]: A type representing the detailed data associated with the metadata.
-abstract class SyncAdapterBase<M, D> {
-  /// Default constructor for [SyncAdapterBase].
-  const SyncAdapterBase();
+abstract class SyncAdapter<M, D> {
+  /// Default constructor for [SyncAdapter].
+  const SyncAdapter();
 
   /// Returns the unique identifier for the given [metadata].
   ///
   /// This identifier is used to uniquely identify metadata items
   /// during the synchronization process.
-  String getMetadataId(M metadata);
+  FutureOr<String> getMetadataId(M metadata);
 
   /// Compares two metadata items to determine if the current one is older.
   ///
   /// Returns `true` if [current] is older than [other], otherwise `false`.
-  bool isCurrentMetadataBeforeOther(M current, M other);
+  FutureOr<bool> isCurrentMetadataBeforeOther(M current, M other);
 
   /// Fetches a list of metadata items available for synchronization.
   ///
   /// Returns a [Future] that resolves to a list of metadata items of type `M`.
-  Future<List<M>> fetchMetadataList();
+  FutureOr<List<M>> fetchMetadataList();
 
   /// Retrieves the detailed data associated with the given [metadata].
   ///
   /// Returns a [Future] that resolves to a detail object of type `D`.
-  Future<D> fetchDetail(M metadata);
+  FutureOr<D> fetchDetail(M metadata);
 
   /// Saves the provided [metadata] and its associated [detail] to the data source.
   ///
   /// Returns a [Future] that completes when the save operation is finished.
-  Future<void> save(M metadata, D detail);
+  FutureOr<void> save(M metadata, D detail);
 }
 
-/// Synchronization adapter for a specific data source.
+/// Abstract base class for a synchronization adapter with serialization capabilities.
 ///
-/// This abstract class extends [SyncAdapterBase] and provides default
-/// implementations for some methods. It is generic over:
-/// - [M]: A type extending [SyncMetadata], representing sync metadata.
-/// - [D]: A type representing the detailed data associated with the metadata.
-abstract class SyncAdapter<M extends SyncMetadata, D>
-    implements SyncAdapterBase<M, D> {
-  /// Default constructor for [SyncAdapter].
-  const SyncAdapter();
-
-  @override
-  String getMetadataId(M metadata) => metadata.id;
-
-  @override
-  bool isCurrentMetadataBeforeOther(M current, M other) =>
-      current.modifiedAt.isBefore(other.modifiedAt);
-
-  /// Fetches a list of metadata items available for synchronization.
-  ///
-  /// Returns a [Future] that resolves to a list of metadata items of type `M`.
-  @override
-  Future<List<M>> fetchMetadataList();
-
-  /// Retrieves the detailed data associated with the given [metadata].
-  ///
-  /// Returns a [Future] that resolves to a detail object of type `D`.
-  @override
-  Future<D> fetchDetail(M metadata);
-
-  /// Saves the provided [metadata] and its associated [detail] to the data source.
-  ///
-  /// Returns a [Future] that completes when the save operation is finished.
-  @override
-  Future<void> save(M metadata, D detail);
-}
-
-/// Synchronization adapter with serialization capabilities.
-///
-/// This abstract class extends [SyncAdapter] and adds methods for converting
-/// metadata objects to and from JSON strings. It is generic over:
-/// - [M]: A type extending [SyncMetadata], representing sync metadata.
+/// This class extends [SyncAdapter] and introduces functionality for
+/// serializing and deserializing metadata objects to and from JSON strings.
+/// It is generic over:
+/// - [M]: A type representing synchronization metadata.
 /// - [D]: A type representing the detailed data associated with the metadata.
 ///
-/// This class is useful for scenarios where metadata needs to be serialized
-/// for storage or transmission, such as in a database or over a network.
-abstract class SerializableSyncAdapter<M extends SyncMetadata, D>
-    extends SyncAdapter<M, D> {
-  /// Default constructor for [SerializableSyncAdapter].
+/// This class is particularly useful in scenarios where metadata needs to be
+/// stored or transmitted in a serialized format, such as in databases or over
+/// a network. It provides a foundation for implementing adapters that handle
+/// serialization seamlessly.
+abstract class SerializableSyncAdapter<M, D> extends SyncAdapter<M, D> {
+  /// Creates a [SerializableSyncAdapter] with the provided serialization functions.
   ///
-  /// - [metadataToJson]: A function that converts metadata of type `M` to a JSON string.
-  /// - [metadataFromJson]: A function that converts a JSON string to metadata of type `M`.
-  /// These functions are used for serialization and deserialization of metadata.
+  /// - [metadataToJson]: A function that converts metadata of type `M` into a JSON string.
+  /// - [metadataFromJson]: A function that converts a JSON string back into metadata of type `M`.
+  ///
+  /// These functions enable the serialization and deserialization of metadata,
+  /// making it easier to store or transmit metadata in a structured format.
   const SerializableSyncAdapter({
     required this.metadataToJson,
     required this.metadataFromJson,
   });
 
-  /// Function to serialize metadata to a JSON string.
-  final String Function(M metadata) metadataToJson;
+  /// A function that converts metadata of type `M` into a JSON string.
+  ///
+  /// This function is used to serialize metadata for storage or transmission.
+  final FutureOr<String> Function(M metadata) metadataToJson;
 
-  /// Function to deserialize metadata from a JSON string.
-  final M Function(String json) metadataFromJson;
+  /// A function that converts a JSON string back into metadata of type `M`.
+  ///
+  /// This function is used to deserialize metadata from a serialized format.
+  final FutureOr<M> Function(String json) metadataFromJson;
 }
