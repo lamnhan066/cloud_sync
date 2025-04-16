@@ -42,6 +42,7 @@ class CloudSync<M, D> {
     required this.fetchCloudDetail,
     required this.saveToLocal,
     required this.saveToCloud,
+    this.throwsWhenError = false,
   });
 
   /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
@@ -55,6 +56,7 @@ class CloudSync<M, D> {
   factory CloudSync.fromAdapters({
     required SyncAdapter<M, D> local,
     required SyncAdapter<M, D> cloud,
+    bool throwWhenError = false,
   }) {
     return CloudSync<M, D>._(
       getLocalMetadataId: local.getMetadataId,
@@ -67,6 +69,7 @@ class CloudSync<M, D> {
       fetchCloudDetail: cloud.fetchDetail,
       saveToLocal: local.save,
       saveToCloud: cloud.save,
+      throwsWhenError: throwWhenError,
     );
   }
 
@@ -99,6 +102,13 @@ class CloudSync<M, D> {
 
   /// Saves a data object to cloud storage.
   final SaveDetail<M, D> saveToCloud;
+
+  /// Indicates whether to throw an error when a sync operation fails.
+  ///
+  /// If not set, the error will be reported via the [SyncProgressCallback].
+  /// This is useful for handling errors in a more controlled manner,
+  /// especially in UI applications where you might want to show an error message.
+  final bool throwsWhenError;
 
   /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
@@ -295,9 +305,8 @@ class CloudSync<M, D> {
         _cancellationCompleter!.complete();
       }
     } catch (error, stackTrace) {
-      if (!updateProgress(() => SyncError(error, stackTrace))) {
-        rethrow;
-      }
+      updateProgress(() => SyncError(error, stackTrace));
+      if (throwsWhenError) rethrow;
     } finally {
       _isSyncInProgress = false;
       _cancellationCompleter = null;
