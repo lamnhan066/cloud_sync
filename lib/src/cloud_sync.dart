@@ -42,7 +42,7 @@ class CloudSync<M, D> {
     required this.fetchCloudDetail,
     required this.saveToLocal,
     required this.saveToCloud,
-    this.throwsWhenError = false,
+    this.shouldThrowOnError = false,
   });
 
   /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
@@ -53,11 +53,14 @@ class CloudSync<M, D> {
   ///
   /// - [local]: The adapter for local storage.
   /// - [cloud]: The adapter for cloud storage.
-  /// - [throwWhenError]: Determines whether to throw an exception when a synchronization error occurs.
+  /// - [shouldThrowOnError]: If `true`, exceptions during synchronization will
+  ///   be thrown to the caller. If `false`, errors will be reported via
+  ///   [SyncProgressCallback] using the [SyncError] state and the sync process
+  ///   will continue.
   factory CloudSync.fromAdapters({
     required SyncAdapter<M, D> local,
     required SyncAdapter<M, D> cloud,
-    bool throwWhenError = false,
+    bool shouldThrowOnError = false,
   }) {
     return CloudSync<M, D>._(
       getLocalMetadataId: local.getMetadataId,
@@ -70,7 +73,7 @@ class CloudSync<M, D> {
       fetchCloudDetail: cloud.fetchDetail,
       saveToLocal: local.save,
       saveToCloud: cloud.save,
-      throwsWhenError: throwWhenError,
+      shouldThrowOnError: shouldThrowOnError,
     );
   }
 
@@ -104,12 +107,14 @@ class CloudSync<M, D> {
   /// Saves a data object to cloud storage.
   final SaveDetail<M, D> saveToCloud;
 
-  /// Determines whether to throw an exception when a synchronization error occurs.
+  /// Configures the behavior for handling synchronization errors.
   ///
-  /// If set to `true`, any error during the sync process will be thrown to the caller.
-  /// If set to `false`, errors will be reported through the [SyncProgressCallback]
-  /// using the [SyncError] state, allowing the sync process to continue.
-  final bool throwsWhenError;
+  /// When set to `true`, any error encountered during the synchronization process
+  /// will be thrown to the caller, halting the sync operation.
+  /// When set to `false`, errors will be reported via the [SyncProgressCallback]
+  /// using the [SyncError] state, allowing the synchronization process to proceed
+  /// despite the errors.
+  final bool shouldThrowOnError;
 
   /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
@@ -307,7 +312,7 @@ class CloudSync<M, D> {
       }
     } catch (error, stackTrace) {
       updateProgress(() => SyncError(error, stackTrace));
-      if (throwsWhenError) rethrow;
+      if (shouldThrowOnError) rethrow;
     } finally {
       _isSyncInProgress = false;
       _cancellationCompleter = null;
