@@ -53,6 +53,7 @@ class CloudSync<M, D> {
   ///
   /// - [local]: The adapter for local storage.
   /// - [cloud]: The adapter for cloud storage.
+  /// - [throwWhenError]: Determines whether to throw an exception when a synchronization error occurs.
   factory CloudSync.fromAdapters({
     required SyncAdapter<M, D> local,
     required SyncAdapter<M, D> cloud,
@@ -103,11 +104,11 @@ class CloudSync<M, D> {
   /// Saves a data object to cloud storage.
   final SaveDetail<M, D> saveToCloud;
 
-  /// Indicates whether to throw an error when a sync operation fails.
+  /// Determines whether to throw an exception when a synchronization error occurs.
   ///
-  /// If not set, the error will be reported via the [SyncProgressCallback].
-  /// This is useful for handling errors in a more controlled manner,
-  /// especially in UI applications where you might want to show an error message.
+  /// If set to `true`, any error during the sync process will be thrown to the caller.
+  /// If set to `false`, errors will be reported through the [SyncProgressCallback]
+  /// using the [SyncError] state, allowing the sync process to continue.
   final bool throwsWhenError;
 
   /// Indicates whether a synchronization process is currently in progress.
