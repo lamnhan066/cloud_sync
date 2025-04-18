@@ -1,45 +1,39 @@
 # CloudSync
 
-> A type-safe, easy-to-use synchronization solution for Dart applications
+> A powerful and easy-to-use synchronization solution for Dart applications, ensuring seamless cloud and local data sync.
 
-[![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync)  
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)  
 [![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
 ---
 
-## 🚀 Overview
+## ✨ Features
 
-CloudSync provides a simple, flexible way to sync data between your local and cloud storage in Dart applications. With built-in support for conflict resolution, progress tracking, concurrent operations, and seamless lifecycle management, CloudSync is designed to make synchronization as smooth as possible.
-
-Whether you're working with files, photos, or any other data, CloudSync takes care of the heavy lifting so you can focus on your application logic.
-
----
-
-## ✨ Key Features
-
-- **Bidirectional Sync**: Effortlessly sync data both ways (local ↔ cloud).
-- **Automatic Conflict Resolution**: Uses a timestamp-based "latest wins" approach.
-- **Sync States Tracking**: Get full visibility into sync progress with 12 different sync states.
-- **Customizable API**: Choose between an adapter-based approach or functional API depending on your preference.
-- **Concurrent Syncing**: Sync multiple items simultaneously for improved performance.
-- **Auto-Sync**: Set up automatic background syncing at custom intervals.
-- **Graceful Cancellation**: Cancel syncs at any time without issues.
-- **Lifecycle Management**: Automatically clean up resources with `dispose()`.
-- **Error Handling**: Built-in error reporting and recovery for better reliability.
+- **Bidirectional Sync**: Effortlessly sync data both ways (cloud ↔ local).
+- **Automatic Conflict Resolution**: Timestamp-based "latest wins" strategy to resolve conflicts.
+- **State Tracking**: Real-time tracking of sync progress with detailed states.
+- **Customizable API**: Choose between an adapter-based approach or functional API.
+- **Concurrent Syncing**: Supports parallel syncing for better performance.
+- **Auto-Sync**: Periodic background syncing to keep data up to date.
+- **Graceful Cancellation**: Safely cancel sync operations when needed.
+- **Error Handling**: Built-in error management and recovery.
+- **Resource Cleanup**: Ensure proper resource management with lifecycle hooks like `dispose()`.
 
 ---
 
-## 📦 Installation
+## 🚀 Getting Started
 
-To get started with CloudSync, add it to your `pubspec.yaml`:
+### Installation
+
+Add the following to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
   cloud_sync: ^<latest_version>
 ```
 
-Then, run the following command to install the package:
+Then run the following command to fetch the package:
 
 ```bash
 flutter pub get
@@ -47,11 +41,13 @@ flutter pub get
 
 ---
 
-## 🏁 Quick Start
+## 🧑‍💻 Usage
 
-CloudSync is designed to be easy to integrate into your project. Here's how to quickly set it up.
+CloudSync is simple to integrate. Here’s a quick guide to get you started with both the **Adapter pattern** and **Functional Injection**.
 
-### Using Adapters
+### Using the Adapter Pattern
+
+The Adapter pattern provides a simple way to sync using predefined interfaces. Below is an example of syncing data using adapters:
 
 ```dart
 final cloudSync = CloudSync<FileMetadata, FileData>.fromAdapters(
@@ -62,7 +58,7 @@ final cloudSync = CloudSync<FileMetadata, FileData>.fromAdapters(
 await cloudSync.sync(
   progressCallback: (state) {
     if (state is SyncCompleted) {
-      print('✅ Sync completed!');
+      print('✅ Sync completed successfully!');
     } else if (state is SyncError) {
       print('❌ Sync failed: ${state.error}');
     }
@@ -70,75 +66,70 @@ await cloudSync.sync(
 );
 ```
 
-### Enable Auto-Sync
+### Enabling Auto-Sync
 
-If you'd like to sync periodically, just use the `autoSync` feature:
+You can enable automatic syncing at regular intervals with the `autoSync` method:
 
 ```dart
 cloudSync.autoSync(
-  interval: Duration(minutes: 5),
+  interval: Duration(minutes: 10),
   progressCallback: handleSyncProgress,
 );
 ```
 
-### Clean Up
+### Manual Sync Control
 
-When you're done, be sure to clean up resources:
+You can also manually trigger sync operations:
 
 ```dart
-await cloudSync.dispose();
+await cloudSync.sync(
+  progressCallback: handleSyncState,
+);
+```
+
+To stop auto-sync, use the `stopAutoSync` method:
+
+```dart
+await cloudSync.stopAutoSync();
 ```
 
 ---
 
-## ⚙️ Architecture Overview
+## 🔧 Configuration Options
 
-CloudSync operates with metadata models and uses a sync flow that handles the detection of changes, conflict resolution, and sync execution.
+CloudSync offers two configuration methods to suit your architecture.
 
-### SyncMetadata Model
+### 1. Adapter-Based Sync
 
-```dart
-abstract class SyncMetadata {
-  final String id;
-  final DateTime modifiedAt;
-  final bool isDeleted;
-}
-```
-
----
-
-## 🔧 Two Implementation Options
-
-CloudSync gives you the flexibility to choose how you want to integrate it into your app: via the **Adapter pattern** or **Functional Injection**.
-
-### 1. Adapter Pattern (Recommended)
+Adapters allow you to define how local and cloud storage interact with your data:
 
 ```dart
-class LocalHiveAdapter implements SyncAdapter<NoteMetadata, Note> {
+class LocalStorageAdapter implements SyncAdapter<NoteMetadata, Note> {
   @override
-  Future<List<NoteMetadata>> fetchMetadataList() => metadataBox.values.toList();
+  Future<List<NoteMetadata>> fetchMetadataList() => localDb.getNotesMetadata();
 
   @override
-  Future<Note> fetchDetail(NoteMetadata meta) async => notesBox.get(meta.id)!;
+  Future<Note> fetchDetail(NoteMetadata metadata) async {
+    return localDb.getNoteById(metadata.id);
+  }
 
   @override
-  Future<void> save(NoteMetadata meta, Note note) async {
-    await notesBox.put(meta.id, note);
-    await metadataBox.put(meta.id, meta);
+  Future<void> save(NoteMetadata metadata, Note note) async {
+    await localDb.save(note);
   }
 }
 ```
 
 ### 2. Functional Injection
 
-If you prefer a more functional approach, you can inject functions directly:
+If you prefer more flexibility, CloudSync can also be configured with functional injection:
 
 ```dart
 final cloudSync = CloudSync<PhotoMetadata, Photo>(
-  fetchLocalMetadataList: localDb.getPhotoMetadata,
-  fetchCloudMetadataList: cloudApi.getPhotoMetadata,
-  fetchLocalDetail: (m) => localDb.getPhoto(m.id),
-  fetchCloudDetail: (m) => cloudApi.downloadPhoto(m.id),
+  fetchLocalMetadataList: localDb.getPhotoMetadataList,
+  fetchCloudMetadataList: cloudApi.getPhotoMetadataList,
+  fetchLocalDetail: (metadata) => localDb.getPhotoById(metadata.id),
+  fetchCloudDetail: (metadata) => cloudApi.downloadPhoto(metadata.id),
   saveToLocal: localDb.savePhoto,
   saveToCloud: cloudApi.uploadPhoto,
 );
@@ -146,50 +137,50 @@ final cloudSync = CloudSync<PhotoMetadata, Photo>(
 
 ---
 
-## 🌀 Sync States
+## 🔄 Sync States
 
-CloudSync tracks sync progress with 12 states, ensuring you're always aware of what's happening during synchronization:
+CloudSync tracks the progress of each sync operation with various states. Here are the available states:
 
-| State               | Description                   |
-|---------------------|-------------------------------|
-| InProgress          | Sync operation is running     |
-| FetchingLocalMetadata | Fetching local metadata      |
-| FetchingCloudMetadata | Fetching cloud metadata      |
-| ScanningLocal       | Checking for changes locally  |
-| ScanningCloud       | Checking for changes in the cloud |
-| SavingToLocal       | Saving data to local storage  |
-| SavedToLocal        | Local save complete           |
-| SavingToCloud       | Uploading data to the cloud   |
-| SavedToCloud        | Cloud save complete           |
-| SyncCompleted       | Sync operation finished       |
-| SyncError           | Sync encountered an error     |
-| SyncCancelled       | Sync was cancelled            |
+| State                | Description                             |
+|----------------------|-----------------------------------------|
+| InProgress           | Sync operation is currently running.    |
+| FetchingLocalMetadata | Fetching metadata from the local store. |
+| FetchingCloudMetadata | Fetching metadata from the cloud.       |
+| ScanningLocal        | Scanning local data for changes.        |
+| ScanningCloud        | Scanning cloud data for changes.        |
+| SavingToLocal        | Saving data to the local store.         |
+| SavedToLocal         | Data successfully saved locally.        |
+| SavingToCloud        | Uploading data to the cloud.            |
+| SavedToCloud         | Data successfully saved to the cloud.   |
+| SyncCompleted        | Sync operation has completed.           |
+| SyncError            | An error occurred during sync.          |
+| SyncCancelled        | Sync operation was cancelled.           |
 
 ---
 
-## 🚀 Advanced Usage
+## ⚙️ Advanced Features
 
 ### Progress Tracking
 
-Monitor the progress of your sync operations with a callback for each sync state:
+Track sync progress using the sync state callback:
 
 ```dart
 void handleSyncState(SyncState state) {
   switch (state) {
     case SavingToCloud(metadata: final meta):
-      showUploading(meta.filename);
+      print('Uploading ${meta.filename}...');
     case SyncError(error: final err):
-      logError(err.toString());
+      print('Sync error: $err');
     case SyncCompleted():
-      showSuccess('Sync complete!');
-    // Handle other states...
+      print('Sync completed!');
+    // Handle other states as needed
   }
 }
 ```
 
 ### Concurrent Sync
 
-For performance optimization, especially with large datasets, enable concurrent syncing:
+Enable concurrent syncing for better performance with large datasets:
 
 ```dart
 await cloudSync.sync(
@@ -198,51 +189,38 @@ await cloudSync.sync(
 );
 ```
 
-### Auto-Sync Control
+### Cancel Sync
 
-Easily enable auto-sync to keep data updated in the background:
-
-```dart
-cloudSync.autoSync(
-  interval: Duration(minutes: 15),
-  progressCallback: handleSyncState,
-);
-
-await cloudSync.stopAutoSync(); // Stop auto-sync when needed
-```
-
-### Cancel an Ongoing Sync
-
-Cancel a sync operation at any time:
+You can cancel an ongoing sync operation at any time:
 
 ```dart
-await cloudSync.cancelSync(); // Triggers SyncCancelled state
+await cloudSync.cancelSync();
 ```
 
 ---
 
-## 🧑‍💻 Best Practices
+## 💡 Best Practices
 
-- **Always call `dispose()`** to free resources when you're done syncing.
-- **Track sync states** in your UI for responsive feedback to the user.
-- **Enable concurrent syncing** for large datasets to speed up operations.
-- **Wrap sync logic in `try/catch`** to handle potential errors.
+- **Always call `dispose()`** when done with CloudSync to free up resources.
+- **Monitor all sync states** in your UI for smooth user experience.
+- **Enable `useConcurrentSync`** for syncing large datasets efficiently.
+- **Wrap sync operations in try/catch** blocks to ensure reliability:
 
 ```dart
 try {
   await cloudSync.sync();
 } on SyncDisposedError {
-  // Handle case where sync was disposed before completion
+  print('Sync operation already disposed.');
 } catch (e) {
-  handleUnexpectedError(e);
+  print('Unexpected error: $e');
 }
 ```
 
 ---
 
-## 📄 Example: Metadata Class
+## 📝 Example: Metadata Class
 
-Here's an example of how to define metadata for your data models:
+Define metadata classes to manage your data models. Here’s an example of a `DocumentMetadata` class:
 
 ```dart
 class DocumentMetadata extends SyncMetadata {
@@ -280,10 +258,10 @@ class DocumentMetadata extends SyncMetadata {
 
 ## 📄 License
 
-This project is licensed under the MIT License — see [LICENSE](LICENSE) for full details.
+CloudSync is open-source software released under the MIT License. See [LICENSE](LICENSE) for full details.
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions to CloudSync! Feel free to open an issue or submit a pull request if you find a bug or have an idea for an enhancement. Let's build something great together!
+We welcome contributions to CloudSync! Whether it’s reporting issues, suggesting new features, or submitting pull requests—feel free to get involved.
