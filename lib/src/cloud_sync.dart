@@ -134,11 +134,11 @@ class CloudSync<M, D> {
 
   /// Starts periodic auto-sync with the given [interval].
   ///
-  /// Optionally provides [progressCallback] to report sync progress.
+  /// Optionally provides [progress] to report sync progress.
   /// If a sync is already in progress when the timer fires, that cycle is skipped.
   void autoSync({
     required Duration interval,
-    SyncProgressCallback<M>? progressCallback,
+    SyncProgressCallback<M>? progress,
   }) {
     if (_isDisposed) {
       throw SyncDisposedError.withMethodName('autoSync()');
@@ -149,7 +149,7 @@ class CloudSync<M, D> {
 
     // Start a periodic timer to trigger synchronization at the specified interval.
     _autoSyncTimer = Timer.periodic(interval, (_) async {
-      await sync(progress: progressCallback);
+      await sync(progress: progress);
     });
   }
 
