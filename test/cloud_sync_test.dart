@@ -492,7 +492,7 @@ void main() {
 
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
-        progressCallback: (state) {
+        progress: (state) {
           if (state is SyncCompleted) {
             syncCompleted = true;
           }
@@ -518,7 +518,7 @@ void main() {
 
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
-        progressCallback: (state) {
+        progress: (state) {
           if (state is SyncCompleted) {
             syncCount++;
           }
@@ -557,7 +557,7 @@ void main() {
       // First round with longer interval
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 200),
-        progressCallback: (state) {
+        progress: (state) {
           if (state is FetchingLocalMetadata) {
             syncTimes.add(DateTime.now());
           }
@@ -576,7 +576,7 @@ void main() {
       // Reset and start again with shorter interval
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
-        progressCallback: (state) {
+        progress: (state) {
           if (state is FetchingLocalMetadata) {
             syncTimes.add(DateTime.now());
           }
@@ -604,7 +604,7 @@ void main() {
 
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
-        progressCallback: (state) {
+        progress: (state) {
           progressCallback(state);
           if (state is FetchingLocalMetadata) {
             syncStartedCount++;
@@ -787,7 +787,7 @@ void main() {
 
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
-        progressCallback: (state) {
+        progress: (state) {
           progressCallback(state);
           if (state is FetchingLocalMetadata) {
             syncStartedCount++;
