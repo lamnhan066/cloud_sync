@@ -132,6 +132,7 @@ final cloudSync = CloudSync<PhotoMetadata, Photo>(
   fetchCloudDetail: (metadata) => cloudApi.downloadPhoto(metadata.id),
   saveToLocal: localDb.savePhoto,
   saveToCloud: cloudApi.uploadPhoto,
+  shouldThrowOnError: false,
 );
 ```
 
