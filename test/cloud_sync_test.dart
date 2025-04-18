@@ -756,11 +756,26 @@ void main() {
       expect(savedToCloudCount, equals(5));
     });
 
-    test('Sync handles exceptions without progress callback', () async {
+    test('Sync handles exceptions with `shouldThrowOnError` is true', () async {
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        shouldThrowOnError: true,
+      );
       localAdapter.throwErrorOnFetchMetadata = true;
 
-      // Without progress callback, errors are rethrown
       expect(() async => cloudSync.sync(), throwsA(isA<Exception>()));
+    });
+
+    test('Sync handles exceptions with `shouldThrowOnError` is false',
+        () async {
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+      );
+      localAdapter.throwErrorOnFetchMetadata = true;
+
+      await expectLater(cloudSync.sync(), isA<void>());
     });
 
     test('Auto sync skips when sync is in progress with timeout', () async {
