@@ -1,7 +1,7 @@
 name: cloud_sync
 description: >
   A Dart library for synchronizing files between local and cloud storage using customizable metadata and file handlers, with progress callbacks and error handling.
-version: 0.4.0-rc.2
+version: 0.4.0-rc.3
 repository: https://github.com/lamnhan066/cloud_sync
 issue_tracker: https://github.com/lamnhan066/cloud_sync/issues
 
