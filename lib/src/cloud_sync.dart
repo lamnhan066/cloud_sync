@@ -332,12 +332,13 @@ class CloudSync<M, D> {
 
   /// Cancels any ongoing sync operation and waits until it's finished.
   Future<void> cancelSync() async {
-    if (_needToCancel) return;
     if (_cancellationCompleter == null) return;
-    if (_cancellationCompleter!.isCompleted) return;
+    if (_needToCancel || _cancellationCompleter!.isCompleted) {
+      return _cancellationCompleter!.future;
+    }
 
     _needToCancel = true;
-    await _cancellationCompleter!.future;
+    return _cancellationCompleter!.future;
   }
 
   /// Disposes resources used by this instance.
