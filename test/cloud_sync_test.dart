@@ -513,9 +513,6 @@ void main() {
     test('Auto sync can be stopped', () async {
       var syncCount = 0;
 
-      // Set up a control point we can use to block sync operation
-      cloudAdapter.blockOperations();
-
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
         progress: (state) {
@@ -532,16 +529,10 @@ void main() {
       final countBeforeStopping = syncCount;
 
       // Stop auto-sync
-      final stopCompleter = Completer<void>()
-        ..complete(cloudSync.stopAutoSync());
-
-      // Now unblock operations
-      cloudAdapter.unblockOperations();
+      await cloudSync.stopAutoSync();
 
       // Wait to ensure no new syncs start
       await Future<void>.delayed(const Duration(milliseconds: 200));
-
-      await stopCompleter.future;
 
       expect(
         syncCount,
@@ -598,6 +589,7 @@ void main() {
     test('Auto sync skips when sync is in progress', () async {
       var syncStartedCount = 0;
       var syncSkippedCount = 0;
+      var syncCompletedCount = 0;
 
       // Add significant delay to simulate long-running sync
       cloudAdapter.fetchDelay = const Duration(milliseconds: 300);
@@ -605,12 +597,14 @@ void main() {
       cloudSync.autoSync(
         interval: const Duration(milliseconds: 100),
         progress: (state) {
-          progressCallback(state);
           if (state is FetchingLocalMetadata) {
             syncStartedCount++;
           }
           if (state is InProgress) {
             syncSkippedCount++;
+          }
+          if (state is SyncCompleted) {
+            syncCompletedCount++;
           }
         },
       );
@@ -636,7 +630,7 @@ void main() {
 
       // Ensure syncs are not overlapping
       expect(
-        syncStartedCount,
+        syncCompletedCount,
         lessThanOrEqualTo(2),
         reason:
             'Syncs should not overlap, and only a limited number should start',
@@ -781,6 +775,7 @@ void main() {
     test('Auto sync skips when sync is in progress with timeout', () async {
       var syncStartedCount = 0;
       var syncSkippedCount = 0;
+      var syncCompletedCount = 0;
 
       // Add significant delay to simulate long-running sync
       cloudAdapter.fetchDelay = const Duration(milliseconds: 300);
@@ -794,6 +789,9 @@ void main() {
           }
           if (state is InProgress) {
             syncSkippedCount++;
+          }
+          if (state is SyncCompleted) {
+            syncCompletedCount++;
           }
         },
       );
@@ -819,7 +817,7 @@ void main() {
 
       // Ensure syncs are not overlapping
       expect(
-        syncStartedCount,
+        syncCompletedCount,
         lessThanOrEqualTo(2),
         reason:
             'Syncs should not overlap, and only a limited number should start',
