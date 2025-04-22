@@ -1,7 +1,7 @@
 # CloudSync
 
-[![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync)  
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)  
+[![Pub Version](https://img.shields.io/pub/v/cloud_sync.svg)](https://pub.dev/packages/cloud_sync) 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![style: very good analysis](https://img.shields.io/badge/style-very_good_analysis-B22C89.svg)](https://pub.dev/packages/very_good_analysis)
 
 Effortlessly synchronize your app's data between local storage and the cloud! `cloud_sync` provides a flexible and robust framework to manage data synchronization in your Flutter applications.
@@ -144,9 +144,11 @@ If your metadata extends `SyncMetadata` and you want built-in JSON serialization
 * `metadataToJson(M metadata)`: Converts your metadata object to a JSON string.
 * `metadataFromJson(String json)`: Creates a metadata object from a JSON string.
 
-**Need Some Inspiration? Check Out Existing Adapters!**
+**Need Some Inspiration? Check Out Existing Adapters:**
 
-To help you get started and see practical examples of how to implement these adapters for different storage solutions, you can explore the **`cloud_sync_adapters`** repository: [https://github.com/lamnhan066/cloud_sync_adapters](https://github.com/lamnhan066/cloud_sync_adapters). This repository might contain adapters for common local storage options or cloud services, which you can use directly or adapt to your specific needs. Studying these examples can significantly speed up your integration of `cloud_sync`. By implementing these adapters thoughtfully, you'll empower `cloud_sync` to manage the intricate details of keeping your app's data consistent and up-to-date across different environments.
+* **cloud_sync_shared_preferences_adapter:** [Pub](https://pub.dev/packages/cloud_sync_shared_preferences_adapter) | [Github](https://github.com/lamnhan066/cloud_sync_adapters/tree/main/packages/cloud_sync_shared_preferences_adapter)
+* **cloud_sync_hive_adapter:** [Pub](https://pub.dev/packages/cloud_sync_hive_adapter) | [Github](https://github.com/lamnhan066/cloud_sync_adapters/tree/main/packages/cloud_sync_hive_adapter)
+* **cloud_sync_google_drive_adapter:** [Pub](https://pub.dev/packages/cloud_sync_google_drive_adapter) | [Github](https://github.com/lamnhan066/cloud_sync_adapters/tree/main/packages/cloud_sync_google_drive_adapter)
 
 ## Advanced Features
 
@@ -158,6 +160,8 @@ To help you get started and see practical examples of how to implement these ada
 ## Contributing
 
 Contributions to the `cloud_sync` package are welcome\! Please feel free to submit issues and pull requests on the [GitHub](https://github.com/lamnhan066/cloud_sync).
+
+If you'd like to add more adapters, you can contribute to the [cloud_sync_adapters](https://github.com/lamnhan066/cloud_sync_adapters) collections.
 
 ## License
 
