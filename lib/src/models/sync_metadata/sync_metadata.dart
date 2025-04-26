@@ -34,7 +34,7 @@ class SyncMetadata {
 class SerializableSyncMetadata extends SyncMetadata {
   /// Constructor that initializes fields from the [SyncMetadata] superclass.
   /// [id] and [modifiedAt] are required, while [isDeleted] is optional.
-  SerializableSyncMetadata({
+  const SerializableSyncMetadata({
     required super.id,
     required super.modifiedAt,
     super.isDeleted,
