@@ -65,16 +65,16 @@ void main() {
           isA<FetchingCloudMetadata>(),
           isA<ScanningCloud>(),
           isA<ScanningLocal>(),
-          isA<SavingToCloud<SyncMetadata>>(),
-          isA<SavedToCloud<SyncMetadata>>(),
+          isA<SavingToCloud>(),
+          isA<SavedToCloud>(),
           isA<SyncCompleted>(),
         ]),
       );
 
       // Get the specific SavingToCloud state for further verification
-      final savingState = progressStates.firstWhere((s) => s is SavingToCloud)
-          as SavingToCloud<SyncMetadata>;
-      expect(savingState.metadata.id, equals('1'));
+      final savingState =
+          progressStates.firstWhere((s) => s is SavingToCloud) as SavingToCloud;
+      expect(savingState.metadata<SyncMetadata>().id, equals('1'));
     });
 
     test('Sync downloads new cloud file', () async {
@@ -93,17 +93,17 @@ void main() {
           isA<FetchingLocalMetadata>(),
           isA<FetchingCloudMetadata>(),
           isA<ScanningCloud>(),
-          isA<SavingToLocal<SyncMetadata>>(),
-          isA<SavedToLocal<SyncMetadata>>(),
+          isA<SavingToLocal>(),
+          isA<SavedToLocal>(),
           isA<ScanningLocal>(),
           isA<SyncCompleted>(),
         ]),
       );
 
       // Verify metadata in SavingToLocal state
-      final savingState = progressStates.firstWhere((s) => s is SavingToLocal)
-          as SavingToLocal<SyncMetadata>;
-      expect(savingState.metadata.id, equals('2'));
+      final savingState =
+          progressStates.firstWhere((s) => s is SavingToLocal) as SavingToLocal;
+      expect(savingState.metadata<SyncMetadata>().id, equals('2'));
     });
 
     test('Sync uploads updated local file', () async {
@@ -520,9 +520,8 @@ void main() {
       final stateTypes = progressStates.map((s) => s.runtimeType).toList();
 
       // Check that local to cloud operations happen before cloud to local operations
-      final uploadStartIndex = stateTypes.indexOf(SavingToCloud<SyncMetadata>);
-      final downloadStartIndex =
-          stateTypes.indexOf(SavingToLocal<SyncMetadata>);
+      final uploadStartIndex = stateTypes.indexOf(SavingToCloud);
+      final downloadStartIndex = stateTypes.indexOf(SavingToLocal);
 
       expect(
         uploadStartIndex < downloadStartIndex,
@@ -560,9 +559,8 @@ void main() {
       final stateTypes = progressStates.map((s) => s.runtimeType).toList();
 
       // Check that cloud to local operations happen before local to cloud operations
-      final downloadStartIndex =
-          stateTypes.indexOf(SavingToLocal<SyncMetadata>);
-      final uploadStartIndex = stateTypes.indexOf(SavingToCloud<SyncMetadata>);
+      final downloadStartIndex = stateTypes.indexOf(SavingToLocal);
+      final uploadStartIndex = stateTypes.indexOf(SavingToCloud);
 
       expect(
         downloadStartIndex < uploadStartIndex,
@@ -706,7 +704,7 @@ void main() {
       final defaultSync = CloudSync.fromAdapters(
         local: localAdapter,
         cloud: cloudAdapter,
-        // No strategy specified - should default to uploadFirst
+        // No strategy specified - should default to downloadFirst
       );
 
       // Add test data
@@ -733,7 +731,7 @@ void main() {
         final downloadStartIndex = stateTypes.indexOf(SavingToLocal);
 
         expect(
-          uploadStartIndex < downloadStartIndex,
+          uploadStartIndex > downloadStartIndex,
           isTrue,
           reason: 'Default strategy should be uploadFirst',
         );
@@ -1110,7 +1108,7 @@ void main() {
       // Verify no download operations were attempted
       expect(progressStates.any((state) => state is ScanningCloud), isFalse);
       expect(
-        progressStates.any((state) => state is SavingToLocal<SyncMetadata>),
+        progressStates.any((state) => state is SavingToLocal),
         isFalse,
       );
     });
@@ -1320,10 +1318,8 @@ void main() {
       }
 
       // Count the save operations
-      final savedToLocalCount =
-          progressStates.whereType<SavedToLocal<SyncMetadata>>().length;
-      final savedToCloudCount =
-          progressStates.whereType<SavedToCloud<SyncMetadata>>().length;
+      final savedToLocalCount = progressStates.whereType<SavedToLocal>().length;
+      final savedToCloudCount = progressStates.whereType<SavedToCloud>().length;
 
       expect(savedToLocalCount, equals(5));
       expect(savedToCloudCount, equals(5));
