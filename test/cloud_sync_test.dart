@@ -179,8 +179,8 @@ void main() {
       expect(progressStates, [
         isA<FetchingLocalMetadata<SyncMetadata>>(),
         isA<FetchingCloudMetadata<SyncMetadata>>(),
-        isA<ScanningLocal<SyncMetadata>>(),
         isA<ScanningCloud<SyncMetadata>>(),
+        isA<ScanningLocal<SyncMetadata>>(),
         isA<SyncCompleted<SyncMetadata>>(),
       ]);
 
@@ -205,8 +205,8 @@ void main() {
         containsAllInOrder([
           isA<FetchingLocalMetadata<SyncMetadata>>(),
           isA<FetchingCloudMetadata<SyncMetadata>>(),
-          isA<ScanningLocal<SyncMetadata>>(),
           isA<ScanningCloud<SyncMetadata>>(),
+          isA<ScanningLocal<SyncMetadata>>(),
           isA<SavingToCloud<SyncMetadata>>(),
           isA<SavedToCloud<SyncMetadata>>(),
           isA<SyncCompleted<SyncMetadata>>(),
@@ -234,10 +234,10 @@ void main() {
         containsAllInOrder([
           isA<FetchingLocalMetadata<SyncMetadata>>(),
           isA<FetchingCloudMetadata<SyncMetadata>>(),
-          isA<ScanningLocal<SyncMetadata>>(),
+          isA<ScanningCloud<SyncMetadata>>(),
           isA<SavingToLocal<SyncMetadata>>(),
           isA<SavedToLocal<SyncMetadata>>(),
-          isA<ScanningCloud<SyncMetadata>>(),
+          isA<ScanningLocal<SyncMetadata>>(),
           isA<SyncCompleted<SyncMetadata>>(),
         ]),
       );
@@ -652,7 +652,7 @@ void main() {
       cloudSync = CloudSync.fromAdapters(
         local: localAdapter,
         cloud: cloudAdapter,
-        useConcurrentSync: true,
+        strategy: SyncStrategy.uploadFirst,
       );
 
       await cloudSync.sync(progress: progressCallback);

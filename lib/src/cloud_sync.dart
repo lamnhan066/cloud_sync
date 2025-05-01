@@ -4,6 +4,7 @@ import 'package:cloud_sync/src/models/sync_adapter.dart';
 import 'package:cloud_sync/src/models/sync_errors.dart';
 import 'package:cloud_sync/src/models/sync_exceptions.dart';
 import 'package:cloud_sync/src/models/sync_state.dart';
+import 'package:cloud_sync/src/models/sync_strategy.dart';
 
 /// A function type that retrieves a unique identifier for a given metadata object.
 typedef GetMetadataId<M> = String Function(M metadata);
@@ -38,7 +39,7 @@ class CloudSync<M, D> {
     required SyncAdapter<M, D> local,
     required SyncAdapter<M, D> cloud,
     this.shouldThrowOnError = false,
-    this.useConcurrentSync = false,
+    this.strategy = SyncStrategy.downloadFirst,
   })  : getLocalMetadataId = local.getMetadataId,
         getCloudMetadataId = cloud.getMetadataId,
         isLocalMetadataBeforeCloud = local.isCurrentMetadataBeforeOther,
@@ -89,12 +90,8 @@ class CloudSync<M, D> {
   /// despite the errors.
   final bool shouldThrowOnError;
 
-  /// Determines whether the synchronization process should run concurrently.
-  ///
-  /// When set to `true`, the synchronization of local and cloud storage
-  /// will occur simultaneously. If `false`, the synchronization will
-  /// proceed sequentially, one direction at a time.
-  final bool useConcurrentSync;
+  /// The strategy used to determine the synchronization approach.
+  final SyncStrategy strategy;
 
   /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
@@ -208,8 +205,8 @@ class CloudSync<M, D> {
       };
 
       // Process synchronization from local to cloud.
-      Future<void> processCloudSync() async {
-        updateProgress(ScanningCloud.new);
+      Future<void> processUpload() async {
+        updateProgress(ScanningLocal.new);
         for (final localMetadata in localMetadataList) {
           _checkCancellation();
 
@@ -237,8 +234,8 @@ class CloudSync<M, D> {
       }
 
       // Process synchronization from cloud to local.
-      Future<void> processLocalSync() async {
-        updateProgress(ScanningLocal.new);
+      Future<void> processDownload() async {
+        updateProgress(ScanningCloud.new);
         for (final cloudMetadata in cloudMetadataList) {
           _checkCancellation();
 
@@ -265,15 +262,22 @@ class CloudSync<M, D> {
         }
       }
 
-      // Run synchronization tasks concurrently or sequentially based on the flag.
-      if (useConcurrentSync) {
-        await Future.wait([
-          processLocalSync(),
-          processCloudSync(),
-        ]);
-      } else {
-        await processLocalSync();
-        await processCloudSync();
+      switch (strategy) {
+        case SyncStrategy.uploadFirst:
+          await processUpload();
+          await processDownload();
+        case SyncStrategy.downloadFirst:
+          await processDownload();
+          await processUpload();
+        case SyncStrategy.uploadOnly:
+          await processUpload();
+        case SyncStrategy.downloadOnly:
+          await processDownload();
+        case SyncStrategy.simultaneously:
+          await Future.wait([
+            processDownload(),
+            processUpload(),
+          ]);
       }
 
       updateProgress(SyncCompleted.new);
