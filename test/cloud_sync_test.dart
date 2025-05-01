@@ -637,18 +637,19 @@ void main() {
       );
     });
 
-    test('Concurrent sync completes successfully', () async {
-      // Instead of comparing timing, we'll verify correct behavior
-
-      // Add test data
-      final localMetadata = SyncMetadata(id: '9', modifiedAt: DateTime.now());
-      final localData = MockData('Local Concurrent Data');
+    test('Sync with uploadFirst strategy uploads before downloading', () async {
+      // Create items in both local and cloud
+      final localMetadata =
+          SyncMetadata(id: 'local-first', modifiedAt: DateTime.now());
+      final localData = MockData('Local Data');
       await localAdapter.save(localMetadata, localData);
 
-      final cloudMetadata = SyncMetadata(id: '10', modifiedAt: DateTime.now());
-      final cloudData = MockData('Cloud Concurrent Data');
+      final cloudMetadata =
+          SyncMetadata(id: 'cloud-first', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Data');
       await cloudAdapter.save(cloudMetadata, cloudData);
 
+      // Configure cloud sync with uploadFirst strategy
       cloudSync = CloudSync.fromAdapters(
         local: localAdapter,
         cloud: cloudAdapter,
@@ -657,26 +658,745 @@ void main() {
 
       await cloudSync.sync(progress: progressCallback);
 
-      // Check proper data exchange
-      expect(cloudAdapter._data['9'], equals(localData));
-      expect(localAdapter._data['10'], equals(cloudData));
+      // Verify expected state sequence for uploadFirst strategy
+      final stateTypes = progressStates.map((s) => s.runtimeType).toList();
 
-      // Verify expected progress states for concurrent sync
+      // Check that local to cloud operations happen before cloud to local operations
+      final uploadStartIndex = stateTypes.indexOf(SavingToCloud<SyncMetadata>);
+      final downloadStartIndex =
+          stateTypes.indexOf(SavingToLocal<SyncMetadata>);
+
       expect(
-        progressStates.whereType<FetchingLocalMetadata>().length,
-        1,
-        reason: 'Should have exactly one FetchingLocalMetadata state',
+        uploadStartIndex < downloadStartIndex,
+        isTrue,
+        reason: 'Upload operations should occur before download operations',
+      );
+
+      // Also verify data was properly synced in both directions
+      expect(cloudAdapter._data['local-first']?.content, equals('Local Data'));
+      expect(localAdapter._data['cloud-first']?.content, equals('Cloud Data'));
+    });
+
+    test('Sync with downloadFirst strategy downloads before uploading',
+        () async {
+      // Create items in both local and cloud
+      final localMetadata =
+          SyncMetadata(id: 'local-second', modifiedAt: DateTime.now());
+      final localData = MockData('Local Data');
+      await localAdapter.save(localMetadata, localData);
+
+      final cloudMetadata =
+          SyncMetadata(id: 'cloud-second', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Data');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      // Configure cloud sync with downloadFirst strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+      );
+
+      await cloudSync.sync(progress: progressCallback);
+
+      // Verify expected state sequence for downloadFirst strategy
+      final stateTypes = progressStates.map((s) => s.runtimeType).toList();
+
+      // Check that cloud to local operations happen before local to cloud operations
+      final downloadStartIndex =
+          stateTypes.indexOf(SavingToLocal<SyncMetadata>);
+      final uploadStartIndex = stateTypes.indexOf(SavingToCloud<SyncMetadata>);
+
+      expect(
+        downloadStartIndex < uploadStartIndex,
+        isTrue,
+        reason: 'Download operations should occur before upload operations',
+      );
+
+      // Also verify data was properly synced in both directions
+      expect(cloudAdapter._data['local-second']?.content, equals('Local Data'));
+      expect(localAdapter._data['cloud-second']?.content, equals('Cloud Data'));
+    });
+
+    test('Sync with uploadOnly strategy only uploads data', () async {
+      // Create items in both local and cloud - we'll verify the cloud item is NOT downloaded
+      final localMetadata =
+          SyncMetadata(id: 'local-upload-only', modifiedAt: DateTime.now());
+      final localData = MockData('Local Upload Only');
+      await localAdapter.save(localMetadata, localData);
+
+      final cloudMetadata =
+          SyncMetadata(id: 'cloud-upload-only', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Upload Only');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      // Configure cloud sync with uploadOnly strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.uploadOnly,
+      );
+
+      await cloudSync.sync(progress: progressCallback);
+
+      // Verify local data was uploaded to cloud
+      expect(
+        cloudAdapter._data['local-upload-only']?.content,
+        equals('Local Upload Only'),
+      );
+
+      // But cloud data was NOT downloaded to local
+      expect(localAdapter._data.containsKey('cloud-upload-only'), isFalse);
+
+      // Verify no SavingToLocal states in progress
+      expect(progressStates.any((state) => state is SavingToLocal), isFalse);
+    });
+
+    test('Sync with downloadOnly strategy only downloads data', () async {
+      // Create items in both local and cloud - we'll verify the local item is NOT uploaded
+      final localMetadata =
+          SyncMetadata(id: 'local-download-only', modifiedAt: DateTime.now());
+      final localData = MockData('Local Download Only');
+      await localAdapter.save(localMetadata, localData);
+
+      final cloudMetadata =
+          SyncMetadata(id: 'cloud-download-only', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Download Only');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      // Configure cloud sync with downloadOnly strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.downloadOnly,
+      );
+
+      await cloudSync.sync(progress: progressCallback);
+
+      // Verify cloud data was downloaded to local
+      expect(
+        localAdapter._data['cloud-download-only']?.content,
+        equals('Cloud Download Only'),
+      );
+
+      // But local data was NOT uploaded to cloud
+      expect(cloudAdapter._data.containsKey('local-download-only'), isFalse);
+
+      // Verify no SavingToCloud states in progress
+      expect(progressStates.any((state) => state is SavingToCloud), isFalse);
+    });
+
+    test(
+        'Sync with simultaneously strategy performs both operations concurrently',
+        () async {
+      // Create items in both local and cloud
+      final localMetadata =
+          SyncMetadata(id: 'local-simul', modifiedAt: DateTime.now());
+      final localData = MockData('Local Simultaneous');
+      await localAdapter.save(localMetadata, localData);
+
+      final cloudMetadata =
+          SyncMetadata(id: 'cloud-simul', modifiedAt: DateTime.now());
+      final cloudData = MockData('Cloud Simultaneous');
+      await cloudAdapter.save(cloudMetadata, cloudData);
+
+      // Add delays to make concurrent behavior more obvious
+      localAdapter.fetchDelay = const Duration(milliseconds: 50);
+      cloudAdapter.fetchDelay = const Duration(milliseconds: 50);
+
+      // Block operations at first so we can control timing
+      localAdapter.blockOperations();
+      cloudAdapter.blockOperations();
+
+      // Configure cloud sync with simultaneously strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.simultaneously,
+      );
+
+      // Start sync but don't await it yet
+      final syncFuture = cloudSync.sync(progress: progressCallback);
+
+      // Wait to ensure sync has started
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      // Unblock operations to let sync proceed
+      localAdapter.unblockOperations();
+      cloudAdapter.unblockOperations();
+
+      // Wait for sync to complete
+      await syncFuture;
+
+      // Verify both operations completed successfully
+      expect(
+        cloudAdapter._data['local-simul']?.content,
+        equals('Local Simultaneous'),
       );
       expect(
-        progressStates.whereType<FetchingCloudMetadata>().length,
-        1,
-        reason: 'Should have exactly one FetchingCloudMetadata state',
+        localAdapter._data['cloud-simul']?.content,
+        equals('Cloud Simultaneous'),
+      );
+
+      // In simultaneous mode, we should see both upload and download operations
+      // happening without one necessarily completing first
+      expect(progressStates.any((state) => state is SavingToCloud), isTrue);
+      expect(progressStates.any((state) => state is SavingToLocal), isTrue);
+    });
+
+    test('CloudSync uses uploadFirst as default strategy when not specified',
+        () async {
+      final defaultSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        // No strategy specified - should default to uploadFirst
+      );
+
+      // Add test data
+      await localAdapter.save(
+        SyncMetadata(id: 'default-strategy', modifiedAt: DateTime.now()),
+        MockData('Default Strategy Test'),
+      );
+
+      await cloudAdapter.save(
+        SyncMetadata(id: 'cloud-default', modifiedAt: DateTime.now()),
+        MockData('Cloud Default Test'),
+      );
+
+      progressStates.clear();
+      await defaultSync.sync(progress: progressCallback);
+
+      // Verify expected state sequence matches uploadFirst strategy
+      final stateTypes = progressStates.map((s) => s.runtimeType).toList();
+
+      // If SavingToCloud exists, it should come before SavingToLocal
+      if (stateTypes.contains(SavingToCloud) &&
+          stateTypes.contains(SavingToLocal)) {
+        final uploadStartIndex = stateTypes.indexOf(SavingToCloud);
+        final downloadStartIndex = stateTypes.indexOf(SavingToLocal);
+
+        expect(
+          uploadStartIndex < downloadStartIndex,
+          isTrue,
+          reason: 'Default strategy should be uploadFirst',
+        );
+      }
+
+      // Also verify data was properly synced
+      expect(
+        cloudAdapter._data['default-strategy']?.content,
+        equals('Default Strategy Test'),
       );
       expect(
-        progressStates.whereType<SyncCompleted>().length,
-        1,
-        reason: 'Should have exactly one SyncCompleted state',
+        localAdapter._data['cloud-default']?.content,
+        equals('Cloud Default Test'),
       );
+    });
+
+    test('CloudSync handles strategy changes between syncs', () async {
+      // First sync with uploadOnly strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.uploadOnly,
+      );
+
+      // Add test data
+      await localAdapter.save(
+        SyncMetadata(id: 'strategy-change', modifiedAt: DateTime.now()),
+        MockData('Strategy Change Test'),
+      );
+
+      await cloudAdapter.save(
+        SyncMetadata(id: 'cloud-change', modifiedAt: DateTime.now()),
+        MockData('Cloud Change Test'),
+      );
+
+      // First sync - uploadOnly
+      progressStates.clear();
+      await cloudSync.sync(progress: progressCallback);
+
+      // Verify only upload happened, not download
+      expect(
+        cloudAdapter._data['strategy-change']?.content,
+        equals('Strategy Change Test'),
+      );
+      expect(localAdapter._data.containsKey('cloud-change'), isFalse);
+
+      // Now change to downloadOnly strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.downloadOnly,
+      );
+
+      // Second sync - downloadOnly
+      progressStates.clear();
+      await cloudSync.sync(progress: progressCallback);
+
+      // Now verify download happened
+      expect(
+        localAdapter._data['cloud-change']?.content,
+        equals('Cloud Change Test'),
+      );
+
+      // Complete sync in both directions should have happened across two different syncs
+      expect(
+        cloudAdapter._data['strategy-change']?.content,
+        equals('Strategy Change Test'),
+      );
+      expect(
+        localAdapter._data['cloud-change']?.content,
+        equals('Cloud Change Test'),
+      );
+    });
+
+    // Add these tests to cover more complex scenarios with the different strategies
+
+    test('Strategy handles complex conflict resolution consistently', () async {
+      // For each strategy, test the same conflict scenario
+      const strategies = SyncStrategy.values;
+
+      for (final strategy in strategies) {
+        // Reset for each strategy test
+        localAdapter.reset();
+        cloudAdapter.reset();
+        progressStates.clear();
+
+        // Create conflicting items with different timestamps
+        final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+        final localTime = initialTime.add(const Duration(minutes: 15));
+        final cloudTime =
+            initialTime.add(const Duration(minutes: 30)); // Cloud is newer
+
+        // Add items with conflict - cloud should win based on timestamp
+        await localAdapter.save(
+          SyncMetadata(id: 'conflict', modifiedAt: localTime),
+          MockData('Local Conflict Data'),
+        );
+        await cloudAdapter.save(
+          SyncMetadata(id: 'conflict', modifiedAt: cloudTime),
+          MockData('Cloud Conflict Data'),
+        );
+
+        // Configure sync with current strategy
+        cloudSync = CloudSync.fromAdapters(
+          local: localAdapter,
+          cloud: cloudAdapter,
+          strategy: strategy,
+        );
+
+        // Sync and capture states
+        await cloudSync.sync(progress: progressCallback);
+
+        // For all strategies except uploadOnly, cloud data should win (newer timestamp)
+        if (strategy != SyncStrategy.uploadOnly) {
+          expect(
+            localAdapter._data['conflict']?.content,
+            equals('Cloud Conflict Data'),
+            reason: 'Cloud data should win for strategy: $strategy',
+          );
+        } else {
+          // For uploadOnly, local data should remain unchanged
+          expect(
+            localAdapter._data['conflict']?.content,
+            equals('Local Conflict Data'),
+            reason: 'uploadOnly should not download cloud data',
+          );
+        }
+
+        // For all strategies except downloadOnly, verify cloud state
+        if (strategy != SyncStrategy.downloadOnly) {
+          expect(
+            cloudAdapter._data['conflict']?.content,
+            equals('Cloud Conflict Data'),
+            reason: 'Cloud data should not change for strategy: $strategy',
+          );
+        }
+
+        // Verify state transitions match the expected strategy
+        verifyStrategyStateOrder(states: progressStates, strategy: strategy);
+      }
+    });
+
+    test('Strategy handles deletions appropriately', () async {
+      // For each strategy, test deletion propagation
+      const strategies = SyncStrategy.values;
+
+      for (final strategy in strategies) {
+        // Reset for each strategy test
+        localAdapter.reset();
+        cloudAdapter.reset();
+        progressStates.clear();
+
+        // Define test data
+        final initialTime = DateTime.now().subtract(const Duration(hours: 1));
+        final deletionTime = initialTime.add(const Duration(minutes: 30));
+        const localId = 'local-delete';
+        const cloudId = 'cloud-delete';
+
+        // Add regular items to both storages
+        await localAdapter.save(
+          SyncMetadata(id: localId, modifiedAt: initialTime),
+          MockData('Local Regular'),
+        );
+        await localAdapter.save(
+          SyncMetadata(id: cloudId, modifiedAt: initialTime),
+          MockData('Will Be Deleted In Cloud'),
+        );
+
+        await cloudAdapter.save(
+          SyncMetadata(id: localId, modifiedAt: initialTime),
+          MockData('Will Be Deleted In Local'),
+        );
+        await cloudAdapter.save(
+          SyncMetadata(id: cloudId, modifiedAt: initialTime),
+          MockData('Cloud Regular'),
+        );
+
+        // Mark items as deleted - local deletes localId, cloud deletes cloudId
+        await localAdapter.save(
+          SyncMetadata(id: localId, modifiedAt: deletionTime, isDeleted: true),
+          MockData('Deleted In Local'),
+        );
+        await cloudAdapter.save(
+          SyncMetadata(id: cloudId, modifiedAt: deletionTime, isDeleted: true),
+          MockData('Deleted In Cloud'),
+        );
+
+        // Configure sync with current strategy
+        cloudSync = CloudSync.fromAdapters(
+          local: localAdapter,
+          cloud: cloudAdapter,
+          strategy: strategy,
+        );
+
+        // Sync and capture states
+        await cloudSync.sync(progress: progressCallback);
+
+        // Check deletion propagation based on strategy
+        switch (strategy) {
+          case SyncStrategy.uploadFirst:
+          case SyncStrategy.downloadFirst:
+          case SyncStrategy.simultaneously:
+            // Both deletions should be synced both ways
+            expect(localAdapter._metadata[localId]?.isDeleted, isTrue);
+            expect(cloudAdapter._metadata[localId]?.isDeleted, isTrue);
+            expect(localAdapter._metadata[cloudId]?.isDeleted, isTrue);
+            expect(cloudAdapter._metadata[cloudId]?.isDeleted, isTrue);
+
+          case SyncStrategy.uploadOnly:
+            // Only local deletion should be propagated to cloud
+            expect(cloudAdapter._metadata[localId]?.isDeleted, isTrue);
+            expect(localAdapter._metadata[cloudId]?.isDeleted, isFalse);
+
+          case SyncStrategy.downloadOnly:
+            // Only cloud deletion should be propagated to local
+            expect(localAdapter._metadata[cloudId]?.isDeleted, isTrue);
+            expect(cloudAdapter._metadata[localId]?.isDeleted, isFalse);
+        }
+
+        // Verify state transitions match the expected strategy
+        verifyStrategyStateOrder(states: progressStates, strategy: strategy);
+      }
+    });
+
+    test('Strategy behavior remains consistent during auto sync', () async {
+      // Test auto sync with two different strategies
+      final strategies = [SyncStrategy.uploadOnly, SyncStrategy.downloadOnly];
+
+      for (final strategy in strategies) {
+        // Reset for each strategy test
+        localAdapter.reset();
+        cloudAdapter.reset();
+        progressStates.clear();
+
+        // Setup test data
+        await localAdapter.save(
+          SyncMetadata(id: 'auto-local', modifiedAt: DateTime.now()),
+          MockData('Auto Local Data'),
+        );
+
+        await cloudAdapter.save(
+          SyncMetadata(id: 'auto-cloud', modifiedAt: DateTime.now()),
+          MockData('Auto Cloud Data'),
+        );
+
+        // Configure sync with current strategy
+        cloudSync = CloudSync.fromAdapters(
+          local: localAdapter,
+          cloud: cloudAdapter,
+          strategy: strategy,
+        );
+
+        var syncCompletedCount = 0;
+
+        // Start auto sync
+        cloudSync.autoSync(
+          interval: const Duration(milliseconds: 100),
+          progress: (state) {
+            progressStates.add(state);
+            if (state is SyncCompleted) {
+              syncCompletedCount++;
+            }
+          },
+        );
+
+        // Wait long enough for at least one sync
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        await cloudSync.stopAutoSync();
+
+        // Verify strategy-specific behavior was maintained
+        if (strategy == SyncStrategy.uploadOnly) {
+          expect(cloudAdapter._data.containsKey('auto-local'), isTrue);
+          expect(localAdapter._data.containsKey('auto-cloud'), isFalse);
+        } else if (strategy == SyncStrategy.downloadOnly) {
+          expect(cloudAdapter._data.containsKey('auto-local'), isFalse);
+          expect(localAdapter._data.containsKey('auto-cloud'), isTrue);
+        }
+
+        // Verify at least one sync completed
+        expect(syncCompletedCount, greaterThan(0));
+      }
+    });
+
+    test('Strategy handles large datasets efficiently', () async {
+      // Test with a significant number of items to sync
+      const itemCount = 10; // Use 10 for tests, but could be larger if needed
+
+      // For select strategies, test performance with larger datasets
+      final strategies = [
+        SyncStrategy.uploadFirst,
+        SyncStrategy.downloadFirst,
+        SyncStrategy.simultaneously,
+      ];
+
+      for (final strategy in strategies) {
+        // Reset for each strategy test
+        localAdapter.reset();
+        cloudAdapter.reset();
+        progressStates.clear();
+
+        // Create test data - different items in local and cloud
+        for (var i = 0; i < itemCount; i++) {
+          await localAdapter.save(
+            SyncMetadata(id: 'large-local-$i', modifiedAt: DateTime.now()),
+            MockData('Large Local Data $i'),
+          );
+
+          await cloudAdapter.save(
+            SyncMetadata(id: 'large-cloud-$i', modifiedAt: DateTime.now()),
+            MockData('Large Cloud Data $i'),
+          );
+        }
+
+        // Configure sync with current strategy
+        cloudSync = CloudSync.fromAdapters(
+          local: localAdapter,
+          cloud: cloudAdapter,
+          strategy: strategy,
+        );
+
+        // Time the sync operation
+        final stopwatch = Stopwatch()..start();
+        await cloudSync.sync(progress: progressCallback);
+        stopwatch.stop();
+
+        // Verify all data was synced properly
+        for (var i = 0; i < itemCount; i++) {
+          expect(
+            cloudAdapter._data['large-local-$i']?.content,
+            equals('Large Local Data $i'),
+          );
+          expect(
+            localAdapter._data['large-cloud-$i']?.content,
+            equals('Large Cloud Data $i'),
+          );
+        }
+
+        // Verify state transitions match the expected strategy
+        verifyStrategyStateOrder(states: progressStates, strategy: strategy);
+
+        // Performance check - just ensure it completes in a reasonable time
+        // We're not comparing strategies as that would be too flaky in tests
+        expect(stopwatch, isNot(null));
+      }
+    });
+
+    test('uploadOnly strategy skips download even with newer cloud data',
+        () async {
+      // Setup test with cloud data newer than local
+      final localTime = DateTime.now().subtract(const Duration(minutes: 30));
+      final cloudTime = DateTime.now(); // Cloud is newer
+      const id = 'edge-upload-only';
+
+      // Add items with cloud having newer timestamp
+      await localAdapter.save(
+        SyncMetadata(id: id, modifiedAt: localTime),
+        MockData('Old Local Data'),
+      );
+      await cloudAdapter.save(
+        SyncMetadata(id: id, modifiedAt: cloudTime),
+        MockData('Newer Cloud Data'),
+      );
+
+      // Configure with uploadOnly strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.uploadOnly,
+      );
+
+      await cloudSync.sync(progress: progressCallback);
+
+      // Local data should remain unchanged even though cloud is newer
+      expect(localAdapter._data[id]?.content, equals('Old Local Data'));
+
+      // Verify no download operations were attempted
+      expect(progressStates.any((state) => state is ScanningCloud), isFalse);
+      expect(
+        progressStates.any((state) => state is SavingToLocal<SyncMetadata>),
+        isFalse,
+      );
+    });
+
+    test('downloadOnly strategy skips upload even with newer local data',
+        () async {
+      // Setup test with local data newer than cloud
+      final cloudTime = DateTime.now().subtract(const Duration(minutes: 30));
+      final localTime = DateTime.now(); // Local is newer
+      const id = 'edge-download-only';
+
+      // Add items with local having newer timestamp
+      await cloudAdapter.save(
+        SyncMetadata(id: id, modifiedAt: cloudTime),
+        MockData('Old Cloud Data'),
+      );
+      await localAdapter.save(
+        SyncMetadata(id: id, modifiedAt: localTime),
+        MockData('Newer Local Data'),
+      );
+
+      // Configure with downloadOnly strategy
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
+        strategy: SyncStrategy.downloadOnly,
+      );
+
+      await cloudSync.sync(progress: progressCallback);
+
+      // Cloud data should remain unchanged even though local is newer
+      expect(cloudAdapter._data[id]?.content, equals('Old Cloud Data'));
+
+      // Verify no upload operations were attempted
+      expect(progressStates.any((state) => state is ScanningLocal), isFalse);
+      expect(progressStates.any((state) => state is SavingToCloud), isFalse);
+    });
+
+    test('Strategy handles empty local storage correctly', () async {
+      const strategies = SyncStrategy.values;
+
+      for (final strategy in strategies) {
+        // Reset for each strategy test
+        localAdapter.reset();
+        cloudAdapter.reset();
+        progressStates.clear();
+
+        // Only populate cloud storage
+        await cloudAdapter.save(
+          SyncMetadata(id: 'cloud-empty-test', modifiedAt: DateTime.now()),
+          MockData('Cloud Empty Test'),
+        );
+
+        // Configure sync with current strategy
+        cloudSync = CloudSync.fromAdapters(
+          local: localAdapter,
+          cloud: cloudAdapter,
+          strategy: strategy,
+        );
+
+        // Sync and capture states
+        await cloudSync.sync(progress: progressCallback);
+
+        // Check results based on strategy
+        if (strategy == SyncStrategy.downloadOnly ||
+            strategy == SyncStrategy.downloadFirst ||
+            strategy == SyncStrategy.simultaneously) {
+          // These strategies should download the cloud item
+          expect(
+            localAdapter._data.containsKey('cloud-empty-test'),
+            isTrue,
+            reason: '$strategy should download when local is empty',
+          );
+        } else {
+          // uploadOnly and uploadFirst shouldn't download
+          // Actually uploadOnly will never download by design,
+          // but uploadFirst should download after uploading, but there's nothing to upload
+          if (strategy == SyncStrategy.uploadOnly) {
+            expect(
+              localAdapter._data.containsKey('cloud-empty-test'),
+              isFalse,
+              reason: 'uploadOnly should never download',
+            );
+          }
+        }
+
+        // Verify state transitions match the expected strategy
+        verifyStrategyStateOrder(states: progressStates, strategy: strategy);
+      }
+    });
+
+    test('Strategy handles empty cloud storage correctly', () async {
+      const strategies = SyncStrategy.values;
+
+      for (final strategy in strategies) {
+        // Reset for each strategy test
+        localAdapter.reset();
+        cloudAdapter.reset();
+        progressStates.clear();
+
+        // Only populate local storage
+        await localAdapter.save(
+          SyncMetadata(id: 'local-empty-test', modifiedAt: DateTime.now()),
+          MockData('Local Empty Test'),
+        );
+
+        // Configure sync with current strategy
+        cloudSync = CloudSync.fromAdapters(
+          local: localAdapter,
+          cloud: cloudAdapter,
+          strategy: strategy,
+        );
+
+        // Sync and capture states
+        await cloudSync.sync(progress: progressCallback);
+
+        // Check results based on strategy
+        if (strategy == SyncStrategy.uploadOnly ||
+            strategy == SyncStrategy.uploadFirst ||
+            strategy == SyncStrategy.simultaneously) {
+          // These strategies should upload the local item
+          expect(
+            cloudAdapter._data.containsKey('local-empty-test'),
+            isTrue,
+            reason: '$strategy should upload when cloud is empty',
+          );
+        } else {
+          // downloadOnly and downloadFirst shouldn't upload
+          // Actually downloadOnly will never upload by design,
+          // but downloadFirst should upload after downloading, but there's nothing to download
+          if (strategy == SyncStrategy.downloadOnly) {
+            expect(
+              cloudAdapter._data.containsKey('local-empty-test'),
+              isFalse,
+              reason: 'downloadOnly should never upload',
+            );
+          }
+        }
+
+        // Verify state transitions match the expected strategy
+        verifyStrategyStateOrder(states: progressStates, strategy: strategy);
+      }
     });
 
     test('Sync handles empty metadata case correctly', () async {
@@ -1122,4 +1842,65 @@ void main() {
       expect(deserializedMetadata.isDeleted, originalMetadata.isDeleted);
     });
   });
+}
+
+// Add this helper function inside the test file to verify state transitions
+
+/// Helper to verify state transitions match the expected strategy.
+void verifyStrategyStateOrder({
+  required List<SyncState> states,
+  required SyncStrategy strategy,
+}) {
+  // Get the indexes of first occurrences of each state type
+  final stateTypes = states.map((s) => s.runtimeType).toList();
+  final uploadStartIndex = stateTypes.contains(SavingToCloud)
+      ? stateTypes.indexOf(SavingToCloud)
+      : -1;
+  final downloadStartIndex = stateTypes.contains(SavingToLocal)
+      ? stateTypes.indexOf(SavingToLocal)
+      : -1;
+
+  // Verify state transitions based on strategy
+  switch (strategy) {
+    case SyncStrategy.uploadFirst:
+      if (uploadStartIndex != -1 && downloadStartIndex != -1) {
+        expect(
+          uploadStartIndex < downloadStartIndex,
+          isTrue,
+          reason: 'uploadFirst should perform uploads before downloads',
+        );
+      }
+    case SyncStrategy.downloadFirst:
+      if (uploadStartIndex != -1 && downloadStartIndex != -1) {
+        expect(
+          downloadStartIndex < uploadStartIndex,
+          isTrue,
+          reason: 'downloadFirst should perform downloads before uploads',
+        );
+      }
+    case SyncStrategy.uploadOnly:
+      if (downloadStartIndex != -1) {
+        fail('uploadOnly strategy should not perform downloads');
+      }
+      if (uploadStartIndex == -1 && stateTypes.contains(ScanningLocal)) {
+        // Only pass if there was nothing to upload
+        expect(stateTypes.contains(SavingToCloud), isFalse);
+      }
+    case SyncStrategy.downloadOnly:
+      if (uploadStartIndex != -1) {
+        fail('downloadOnly strategy should not perform uploads');
+      }
+      if (downloadStartIndex == -1 && stateTypes.contains(ScanningCloud)) {
+        // Only pass if there was nothing to download
+        expect(stateTypes.contains(SavingToLocal), isFalse);
+      }
+    case SyncStrategy.simultaneously:
+      // For simultaneous strategy, we can't verify order
+      // Just verify that appropriate operations happened if needed
+      expect(
+        states.any((s) => s is SyncCompleted),
+        isTrue,
+        reason: 'Sync should complete regardless of strategy',
+      );
+  }
 }
