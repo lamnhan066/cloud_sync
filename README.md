@@ -20,7 +20,7 @@ This package provides the foundational building blocks to implement your own syn
 * **Error Handling:** Gracefully manage errors during synchronization.
 * **Auto-Sync:** Set up automatic background synchronization at specified intervals.
 * **Cancellation:** Easily cancel ongoing synchronization operations.
-* **Concurrency:** Option to run local and cloud synchronization processes concurrently for faster syncing.
+* **Synchronization Strategies:** Strategies to perform upload and download operations.
 * **Extensible:** Designed to be adaptable to your specific data structures and storage mechanisms.
 
 ## Getting Started
@@ -32,7 +32,7 @@ Add `cloud_sync` to your `pubspec.yaml` file:
 ```yaml
 dependencies:
   cloud_sync: ^<latest_version>
-````
+```
 
 Replace `<latest_version>` with the current version of the package (you can find this on the [pub.dev](https://pub.dev/packages/cloud_sync)).
 
@@ -58,7 +58,7 @@ flutter pub get
 
 * **`CloudSync`**: This is the main class that orchestrates the synchronization process using your local and cloud adapters.
 
-* **`SyncState`**: Represents the current status of the synchronization, allowing you to provide feedback to your users (e.g., "Syncing...", "Sync Complete", "Error\!").
+* **`SyncState`**: Represents the current status of the synchronization, allowing you to provide feedback to your users (e.g., "Syncing...", "Sync Complete", "Error!").
 
 ### 3\. Basic Usage
 
@@ -154,12 +154,17 @@ If your metadata extends `SyncMetadata` and you want built-in JSON serialization
 
 * **Error Handling (`shouldThrowOnError`)**: Control whether errors during synchronization are thrown or reported via the `progress`.
 * **Cancellation (`cancelSync`)**: Stop a long-running synchronization process if needed.
-* **Concurrency (`useConcurrentSync`)**: Potentially speed up synchronization by performing local and cloud operations in parallel.
+* **Synchronization Strategies**:
+  * `uploadFirst`: Prioritizes uploading data before downloading.
+  * `downloadFirst`: Prioritizes downloading data before uploading.
+  * `uploadOnly`: Only uploads data without downloading.
+  * `downloadOnly`: Only downloads data without uploading.
+  * `concurrently`: Performs upload and download operations concurrently.
 * **Custom Metadata**: While `SyncMetadata` is provided, you can create your own metadata class that extends it to include additional information relevant to your data.
 
 ## Contributing
 
-Contributions to the `cloud_sync` package are welcome\! Please feel free to submit issues and pull requests on the [GitHub](https://github.com/lamnhan066/cloud_sync).
+Contributions to the `cloud_sync` package are welcome! Please feel free to submit issues and pull requests on the [GitHub](https://github.com/lamnhan066/cloud_sync).
 
 If you'd like to add more adapters, you can contribute to the [cloud_sync_adapters](https://github.com/lamnhan066/cloud_sync_adapters) collections.
 
