@@ -1,6 +1,6 @@
 ## 0.4.0
 
-- Refactor CloudSync factory method documentation for clarity and consistency
+- **BREADKING CHANGE:** Refactor CloudSync factory documentation for clarity and consistency
   
   From:
   
@@ -17,11 +17,15 @@
     );
   ```
 
+- **BREAKING CHANGE:** Remove `CloudSync` constructor
+- **BREAKING CHANGE:** Refactor `CloudSync` and `CloudSyncAdapter` to make generic type parameters don't depend on `SyncMetadata`
+- **BREAKING CHANGE:** Replace `useConcurrentSync` with `syncStrategy`
+- **BREAKING CHANGE:** Refactor SyncState to remove generic type parameters
+- **BREAKING CHANGE:** Rename from `progressCallback` to `progress`
+- **BREAKING CHANGE:** `cancelSync`, `stopAutoSync` and `dispose` methods are now return `Future<void>` to wait for the operations to finish
 - Add `SerializableSyncAdapter` with required metadata functions for improved serialization support
 - Add `SerializableSyncMetadata` class for improved serialization and deserialization
-- `cancelSync`, `stopAutoSync` and `dispose` methods are now return `Future<void>` to wait for the operations to finish
 - Add `shouldThrowOnError` to `CloudSync`
-- Rename from `progressCallback` to `progress`
 
 ## 0.3.0
 
