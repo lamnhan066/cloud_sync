@@ -20,7 +20,7 @@
 - **BREAKING CHANGE:** Remove `CloudSync` constructor
 - **BREAKING CHANGE:** Refactor `CloudSync` and `CloudSyncAdapter` to make generic type parameters don't depend on `SyncMetadata`
 - **BREAKING CHANGE:** Replace `useConcurrentSync` with `syncStrategy`
-- **BREAKING CHANGE:** Refactor SyncState to remove generic type parameters
+- **BREAKING CHANGE:** Refactor `SyncState` to remove generic type parameters
 - **BREAKING CHANGE:** Rename from `progressCallback` to `progress`
 - **BREAKING CHANGE:** `cancelSync`, `stopAutoSync` and `dispose` methods are now return `Future<void>` to wait for the operations to finish
 - Add `SerializableSyncAdapter` with required metadata functions for improved serialization support
