@@ -1,151 +1,9 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:cloud_sync/cloud_sync.dart';
 import 'package:test/test.dart';
 
-class MockData {
-  MockData(this.content);
-
-  factory MockData.fromMap(Map<String, dynamic> map) {
-    return MockData(map['content'] as String);
-  }
-  final String content;
-
-  Map<String, dynamic> toMap() {
-    return {'content': content};
-  }
-
-  @override
-  String toString() => 'MockData(content: $content)';
-}
-
-class MockSyncAdapter extends SyncMetadataAdapter<SyncMetadata, MockData> {
-  final Map<String, MockData> _data = {};
-  final Map<String, SyncMetadata> _metadata = {};
-  bool throwErrorOnFetchMetadata = false;
-  bool throwErrorOnFetchDetail = false;
-  bool throwErrorOnSave = false;
-
-  // Add delay for testing timeouts and concurrent behavior
-  Duration fetchDelay = Duration.zero;
-  Duration saveDelay = Duration.zero;
-
-  // Tracking calls for verification
-  int fetchMetadataCallCount = 0;
-  int fetchDetailCallCount = 0;
-  int saveCallCount = 0;
-
-  // Add a Completer to allow controlled completion of operations
-  Completer<void>? operationCompleter;
-
-  void reset() {
-    _data.clear();
-    _metadata.clear();
-    throwErrorOnFetchMetadata = false;
-    throwErrorOnFetchDetail = false;
-    throwErrorOnSave = false;
-    fetchDelay = Duration.zero;
-    saveDelay = Duration.zero;
-    fetchMetadataCallCount = 0;
-    fetchDetailCallCount = 0;
-    saveCallCount = 0;
-    operationCompleter = null;
-  }
-
-  @override
-  Future<List<SyncMetadata>> fetchMetadataList() async {
-    fetchMetadataCallCount++;
-    if (fetchDelay > Duration.zero) {
-      await Future<void>.delayed(fetchDelay);
-    }
-    if (operationCompleter != null) {
-      await operationCompleter!.future;
-    }
-    if (throwErrorOnFetchMetadata) {
-      throw Exception('Fetch Metadata Error');
-    }
-    return _metadata.values.toList();
-  }
-
-  @override
-  Future<MockData> fetchDetail(SyncMetadata metadata) async {
-    fetchDetailCallCount++;
-    if (fetchDelay > Duration.zero) {
-      await Future<void>.delayed(fetchDelay);
-    }
-    if (operationCompleter != null) {
-      await operationCompleter!.future;
-    }
-    if (throwErrorOnFetchDetail) {
-      throw Exception('Fetch Detail Error');
-    }
-    final data = _data[metadata.id];
-    if (data == null) {
-      throw Exception('Data not found for ID: ${metadata.id}');
-    }
-    return data;
-  }
-
-  @override
-  Future<void> save(SyncMetadata metadata, MockData detail) async {
-    saveCallCount++;
-    if (saveDelay > Duration.zero) {
-      await Future<void>.delayed(saveDelay);
-    }
-    if (operationCompleter != null) {
-      await operationCompleter!.future;
-    }
-    if (throwErrorOnSave) {
-      throw Exception('Save Error');
-    }
-    _metadata[metadata.id] = metadata;
-    _data[metadata.id] = detail;
-  }
-
-  // Helper method to simulate operations in progress
-  void blockOperations() {
-    operationCompleter = Completer<void>();
-  }
-
-  // Helper method to unblock operations
-  void unblockOperations() {
-    if (operationCompleter != null && !operationCompleter!.isCompleted) {
-      operationCompleter!.complete();
-    }
-  }
-}
-
-class MockSerializableSyncAdapter
-    extends SerializableSyncMetadataAdapter<SyncMetadata, MockData> {
-  MockSerializableSyncAdapter({
-    required super.metadataToJson,
-    required super.metadataFromJson,
-  });
-
-  @override
-  Future<List<SyncMetadata>> fetchMetadataList() async => [];
-
-  @override
-  Future<MockData> fetchDetail(SyncMetadata metadata) async => MockData('');
-
-  @override
-  Future<void> save(SyncMetadata metadata, MockData detail) async {}
-}
-
-// Custom equality matcher for SyncState types
-class IsSyncStateType extends Matcher {
-  IsSyncStateType(this.expectedType);
-  final Type expectedType;
-
-  @override
-  bool matches(dynamic item, Map<dynamic, dynamic> matchState) =>
-      item.runtimeType == expectedType;
-
-  @override
-  Description describe(Description description) =>
-      description.add('is a $expectedType');
-}
+import 'moks.dart';
 
 void main() {
   group('CloudSync Tests', () {
@@ -197,8 +55,8 @@ void main() {
 
       await cloudSync.sync(progress: progressCallback);
 
-      expect(cloudAdapter._data['1'], equals(localData));
-      expect(cloudAdapter._metadata['1'], equals(localMetadata));
+      expect(cloudAdapter.data['1'], equals(localData));
+      expect(cloudAdapter.metadata['1'], equals(localMetadata));
 
       expect(
         progressStates,
@@ -226,8 +84,8 @@ void main() {
 
       await cloudSync.sync(progress: progressCallback);
 
-      expect(localAdapter._data['2'], equals(cloudData));
-      expect(localAdapter._metadata['2'], equals(cloudMetadata));
+      expect(localAdapter.data['2'], equals(cloudData));
+      expect(localAdapter.metadata['2'], equals(cloudMetadata));
 
       expect(
         progressStates,
@@ -265,12 +123,12 @@ void main() {
 
       await cloudSync.sync(progress: progressCallback);
 
-      expect(cloudAdapter._data[id]?.content, equals('New Local Data'));
+      expect(cloudAdapter.data[id]?.content, equals('New Local Data'));
 
       // Verify the cloud metadata was updated with the newer timestamp
       // Use isA matcher with a custom predicate instead of equality
       expect(
-        cloudAdapter._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        cloudAdapter.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(updatedTime.millisecondsSinceEpoch),
       );
     });
@@ -292,11 +150,11 @@ void main() {
 
       await cloudSync.sync(progress: progressCallback);
 
-      expect(localAdapter._data[id]?.content, equals('New Cloud Data'));
+      expect(localAdapter.data[id]?.content, equals('New Cloud Data'));
 
       // Verify the local metadata was updated with the newer timestamp
       expect(
-        localAdapter._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        localAdapter.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(updatedTime.millisecondsSinceEpoch),
       );
     });
@@ -326,9 +184,9 @@ void main() {
       // Sync and verify deletion propagates to cloud
       await cloudSync.sync(progress: progressCallback);
 
-      expect(cloudAdapter._metadata[id]?.isDeleted, isTrue);
+      expect(cloudAdapter.metadata[id]?.isDeleted, isTrue);
       expect(
-        cloudAdapter._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        cloudAdapter.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(deletionTime.millisecondsSinceEpoch),
       );
     });
@@ -358,9 +216,9 @@ void main() {
       // Sync and verify deletion propagates to local
       await cloudSync.sync(progress: progressCallback);
 
-      expect(localAdapter._metadata[id]?.isDeleted, isTrue);
+      expect(localAdapter.metadata[id]?.isDeleted, isTrue);
       expect(
-        localAdapter._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        localAdapter.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(deletionTime.millisecondsSinceEpoch),
       );
     });
@@ -397,9 +255,9 @@ void main() {
       await cloudSync.sync(progress: progressCallback);
 
       // Modified data should win as it has newer timestamp
-      expect(localAdapter._metadata[id]?.isDeleted, isFalse);
-      expect(localAdapter._data[id]?.content, equals('Modified Data'));
-      expect(cloudAdapter._metadata[id]?.isDeleted, isFalse);
+      expect(localAdapter.metadata[id]?.isDeleted, isFalse);
+      expect(localAdapter.data[id]?.content, equals('Modified Data'));
+      expect(cloudAdapter.metadata[id]?.isDeleted, isFalse);
     });
 
     test('Sync handles error on fetch local metadata', () async {
@@ -673,8 +531,8 @@ void main() {
       );
 
       // Also verify data was properly synced in both directions
-      expect(cloudAdapter._data['local-first']?.content, equals('Local Data'));
-      expect(localAdapter._data['cloud-first']?.content, equals('Cloud Data'));
+      expect(cloudAdapter.data['local-first']?.content, equals('Local Data'));
+      expect(localAdapter.data['cloud-first']?.content, equals('Cloud Data'));
     });
 
     test('Sync with downloadFirst strategy downloads before uploading',
@@ -713,8 +571,8 @@ void main() {
       );
 
       // Also verify data was properly synced in both directions
-      expect(cloudAdapter._data['local-second']?.content, equals('Local Data'));
-      expect(localAdapter._data['cloud-second']?.content, equals('Cloud Data'));
+      expect(cloudAdapter.data['local-second']?.content, equals('Local Data'));
+      expect(localAdapter.data['cloud-second']?.content, equals('Cloud Data'));
     });
 
     test('Sync with uploadOnly strategy only uploads data', () async {
@@ -740,12 +598,12 @@ void main() {
 
       // Verify local data was uploaded to cloud
       expect(
-        cloudAdapter._data['local-upload-only']?.content,
+        cloudAdapter.data['local-upload-only']?.content,
         equals('Local Upload Only'),
       );
 
       // But cloud data was NOT downloaded to local
-      expect(localAdapter._data.containsKey('cloud-upload-only'), isFalse);
+      expect(localAdapter.data.containsKey('cloud-upload-only'), isFalse);
 
       // Verify no SavingToLocal states in progress
       expect(progressStates.any((state) => state is SavingToLocal), isFalse);
@@ -774,12 +632,12 @@ void main() {
 
       // Verify cloud data was downloaded to local
       expect(
-        localAdapter._data['cloud-download-only']?.content,
+        localAdapter.data['cloud-download-only']?.content,
         equals('Cloud Download Only'),
       );
 
       // But local data was NOT uploaded to cloud
-      expect(cloudAdapter._data.containsKey('local-download-only'), isFalse);
+      expect(cloudAdapter.data.containsKey('local-download-only'), isFalse);
 
       // Verify no SavingToCloud states in progress
       expect(progressStates.any((state) => state is SavingToCloud), isFalse);
@@ -811,7 +669,7 @@ void main() {
       cloudSync = CloudSync.fromAdapters(
         local: localAdapter,
         cloud: cloudAdapter,
-        strategy: SyncStrategy.simultaneously,
+        strategy: SyncStrategy.concurrently,
       );
 
       // Start sync but don't await it yet
@@ -829,11 +687,11 @@ void main() {
 
       // Verify both operations completed successfully
       expect(
-        cloudAdapter._data['local-simul']?.content,
+        cloudAdapter.data['local-simul']?.content,
         equals('Local Simultaneous'),
       );
       expect(
-        localAdapter._data['cloud-simul']?.content,
+        localAdapter.data['cloud-simul']?.content,
         equals('Cloud Simultaneous'),
       );
 
@@ -883,11 +741,11 @@ void main() {
 
       // Also verify data was properly synced
       expect(
-        cloudAdapter._data['default-strategy']?.content,
+        cloudAdapter.data['default-strategy']?.content,
         equals('Default Strategy Test'),
       );
       expect(
-        localAdapter._data['cloud-default']?.content,
+        localAdapter.data['cloud-default']?.content,
         equals('Cloud Default Test'),
       );
     });
@@ -917,10 +775,10 @@ void main() {
 
       // Verify only upload happened, not download
       expect(
-        cloudAdapter._data['strategy-change']?.content,
+        cloudAdapter.data['strategy-change']?.content,
         equals('Strategy Change Test'),
       );
-      expect(localAdapter._data.containsKey('cloud-change'), isFalse);
+      expect(localAdapter.data.containsKey('cloud-change'), isFalse);
 
       // Now change to downloadOnly strategy
       cloudSync = CloudSync.fromAdapters(
@@ -935,22 +793,20 @@ void main() {
 
       // Now verify download happened
       expect(
-        localAdapter._data['cloud-change']?.content,
+        localAdapter.data['cloud-change']?.content,
         equals('Cloud Change Test'),
       );
 
       // Complete sync in both directions should have happened across two different syncs
       expect(
-        cloudAdapter._data['strategy-change']?.content,
+        cloudAdapter.data['strategy-change']?.content,
         equals('Strategy Change Test'),
       );
       expect(
-        localAdapter._data['cloud-change']?.content,
+        localAdapter.data['cloud-change']?.content,
         equals('Cloud Change Test'),
       );
     });
-
-    // Add these tests to cover more complex scenarios with the different strategies
 
     test('Strategy handles complex conflict resolution consistently', () async {
       // For each strategy, test the same conflict scenario
@@ -991,14 +847,14 @@ void main() {
         // For all strategies except uploadOnly, cloud data should win (newer timestamp)
         if (strategy != SyncStrategy.uploadOnly) {
           expect(
-            localAdapter._data['conflict']?.content,
+            localAdapter.data['conflict']?.content,
             equals('Cloud Conflict Data'),
             reason: 'Cloud data should win for strategy: $strategy',
           );
         } else {
           // For uploadOnly, local data should remain unchanged
           expect(
-            localAdapter._data['conflict']?.content,
+            localAdapter.data['conflict']?.content,
             equals('Local Conflict Data'),
             reason: 'uploadOnly should not download cloud data',
           );
@@ -1007,7 +863,7 @@ void main() {
         // For all strategies except downloadOnly, verify cloud state
         if (strategy != SyncStrategy.downloadOnly) {
           expect(
-            cloudAdapter._data['conflict']?.content,
+            cloudAdapter.data['conflict']?.content,
             equals('Cloud Conflict Data'),
             reason: 'Cloud data should not change for strategy: $strategy',
           );
@@ -1077,22 +933,22 @@ void main() {
         switch (strategy) {
           case SyncStrategy.uploadFirst:
           case SyncStrategy.downloadFirst:
-          case SyncStrategy.simultaneously:
+          case SyncStrategy.concurrently:
             // Both deletions should be synced both ways
-            expect(localAdapter._metadata[localId]?.isDeleted, isTrue);
-            expect(cloudAdapter._metadata[localId]?.isDeleted, isTrue);
-            expect(localAdapter._metadata[cloudId]?.isDeleted, isTrue);
-            expect(cloudAdapter._metadata[cloudId]?.isDeleted, isTrue);
+            expect(localAdapter.metadata[localId]?.isDeleted, isTrue);
+            expect(cloudAdapter.metadata[localId]?.isDeleted, isTrue);
+            expect(localAdapter.metadata[cloudId]?.isDeleted, isTrue);
+            expect(cloudAdapter.metadata[cloudId]?.isDeleted, isTrue);
 
           case SyncStrategy.uploadOnly:
             // Only local deletion should be propagated to cloud
-            expect(cloudAdapter._metadata[localId]?.isDeleted, isTrue);
-            expect(localAdapter._metadata[cloudId]?.isDeleted, isFalse);
+            expect(cloudAdapter.metadata[localId]?.isDeleted, isTrue);
+            expect(localAdapter.metadata[cloudId]?.isDeleted, isFalse);
 
           case SyncStrategy.downloadOnly:
             // Only cloud deletion should be propagated to local
-            expect(localAdapter._metadata[cloudId]?.isDeleted, isTrue);
-            expect(cloudAdapter._metadata[localId]?.isDeleted, isFalse);
+            expect(localAdapter.metadata[cloudId]?.isDeleted, isTrue);
+            expect(cloudAdapter.metadata[localId]?.isDeleted, isFalse);
         }
 
         // Verify state transitions match the expected strategy
@@ -1147,11 +1003,11 @@ void main() {
 
         // Verify strategy-specific behavior was maintained
         if (strategy == SyncStrategy.uploadOnly) {
-          expect(cloudAdapter._data.containsKey('auto-local'), isTrue);
-          expect(localAdapter._data.containsKey('auto-cloud'), isFalse);
+          expect(cloudAdapter.data.containsKey('auto-local'), isTrue);
+          expect(localAdapter.data.containsKey('auto-cloud'), isFalse);
         } else if (strategy == SyncStrategy.downloadOnly) {
-          expect(cloudAdapter._data.containsKey('auto-local'), isFalse);
-          expect(localAdapter._data.containsKey('auto-cloud'), isTrue);
+          expect(cloudAdapter.data.containsKey('auto-local'), isFalse);
+          expect(localAdapter.data.containsKey('auto-cloud'), isTrue);
         }
 
         // Verify at least one sync completed
@@ -1167,7 +1023,7 @@ void main() {
       final strategies = [
         SyncStrategy.uploadFirst,
         SyncStrategy.downloadFirst,
-        SyncStrategy.simultaneously,
+        SyncStrategy.concurrently,
       ];
 
       for (final strategy in strategies) {
@@ -1204,11 +1060,11 @@ void main() {
         // Verify all data was synced properly
         for (var i = 0; i < itemCount; i++) {
           expect(
-            cloudAdapter._data['large-local-$i']?.content,
+            cloudAdapter.data['large-local-$i']?.content,
             equals('Large Local Data $i'),
           );
           expect(
-            localAdapter._data['large-cloud-$i']?.content,
+            localAdapter.data['large-cloud-$i']?.content,
             equals('Large Cloud Data $i'),
           );
         }
@@ -1249,7 +1105,7 @@ void main() {
       await cloudSync.sync(progress: progressCallback);
 
       // Local data should remain unchanged even though cloud is newer
-      expect(localAdapter._data[id]?.content, equals('Old Local Data'));
+      expect(localAdapter.data[id]?.content, equals('Old Local Data'));
 
       // Verify no download operations were attempted
       expect(progressStates.any((state) => state is ScanningCloud), isFalse);
@@ -1286,7 +1142,7 @@ void main() {
       await cloudSync.sync(progress: progressCallback);
 
       // Cloud data should remain unchanged even though local is newer
-      expect(cloudAdapter._data[id]?.content, equals('Old Cloud Data'));
+      expect(cloudAdapter.data[id]?.content, equals('Old Cloud Data'));
 
       // Verify no upload operations were attempted
       expect(progressStates.any((state) => state is ScanningLocal), isFalse);
@@ -1321,10 +1177,10 @@ void main() {
         // Check results based on strategy
         if (strategy == SyncStrategy.downloadOnly ||
             strategy == SyncStrategy.downloadFirst ||
-            strategy == SyncStrategy.simultaneously) {
+            strategy == SyncStrategy.concurrently) {
           // These strategies should download the cloud item
           expect(
-            localAdapter._data.containsKey('cloud-empty-test'),
+            localAdapter.data.containsKey('cloud-empty-test'),
             isTrue,
             reason: '$strategy should download when local is empty',
           );
@@ -1334,7 +1190,7 @@ void main() {
           // but uploadFirst should download after uploading, but there's nothing to upload
           if (strategy == SyncStrategy.uploadOnly) {
             expect(
-              localAdapter._data.containsKey('cloud-empty-test'),
+              localAdapter.data.containsKey('cloud-empty-test'),
               isFalse,
               reason: 'uploadOnly should never download',
             );
@@ -1374,10 +1230,10 @@ void main() {
         // Check results based on strategy
         if (strategy == SyncStrategy.uploadOnly ||
             strategy == SyncStrategy.uploadFirst ||
-            strategy == SyncStrategy.simultaneously) {
+            strategy == SyncStrategy.concurrently) {
           // These strategies should upload the local item
           expect(
-            cloudAdapter._data.containsKey('local-empty-test'),
+            cloudAdapter.data.containsKey('local-empty-test'),
             isTrue,
             reason: '$strategy should upload when cloud is empty',
           );
@@ -1387,7 +1243,7 @@ void main() {
           // but downloadFirst should upload after downloading, but there's nothing to download
           if (strategy == SyncStrategy.downloadOnly) {
             expect(
-              cloudAdapter._data.containsKey('local-empty-test'),
+              cloudAdapter.data.containsKey('local-empty-test'),
               isFalse,
               reason: 'downloadOnly should never upload',
             );
@@ -1428,8 +1284,8 @@ void main() {
       await cloudSync.sync(progress: progressCallback);
 
       // Data should remain unchanged in both directions
-      expect(localAdapter._data[id]?.content, equals('Local Data'));
-      expect(cloudAdapter._data[id]?.content, equals('Cloud Data'));
+      expect(localAdapter.data[id]?.content, equals('Local Data'));
+      expect(cloudAdapter.data[id]?.content, equals('Cloud Data'));
     });
 
     test('Sync synchronizes multiple items correctly', () async {
@@ -1454,11 +1310,11 @@ void main() {
       // Verify all items were synced both ways
       for (var i = 0; i < 5; i++) {
         expect(
-          cloudAdapter._data['local-$i']?.content,
+          cloudAdapter.data['local-$i']?.content,
           equals('Local data $i'),
         );
         expect(
-          localAdapter._data['cloud-$i']?.content,
+          localAdapter.data['cloud-$i']?.content,
           equals('Cloud data $i'),
         );
       }
@@ -1593,7 +1449,7 @@ void main() {
 
       // If cancellation worked correctly, cloud should not have received the data
       expect(
-        cloudAdapter._data.containsKey('cancel-test'),
+        cloudAdapter.data.containsKey('cancel-test'),
         isFalse,
         reason: 'Cancelled sync should not complete the data transfer',
       );
@@ -1673,173 +1529,28 @@ void main() {
       await cloudFirstSync.sync();
 
       // Both approaches should result in the data being in both places
-      expect(localFirstAdapter1._data[id], equals(data));
-      expect(localFirstAdapter2._data[id], equals(data));
-      expect(cloudFirstAdapter1._data[id], equals(data));
-      expect(cloudFirstAdapter2._data[id], equals(data));
+      expect(localFirstAdapter1.data[id], equals(data));
+      expect(localFirstAdapter2.data[id], equals(data));
+      expect(cloudFirstAdapter1.data[id], equals(data));
+      expect(cloudFirstAdapter2.data[id], equals(data));
 
       // And the metadata should be consistent
       expect(
-        localFirstAdapter1._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        localFirstAdapter1.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(timestamp.millisecondsSinceEpoch),
       );
       expect(
-        localFirstAdapter2._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        localFirstAdapter2.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(timestamp.millisecondsSinceEpoch),
       );
       expect(
-        cloudFirstAdapter1._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        cloudFirstAdapter1.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(timestamp.millisecondsSinceEpoch),
       );
       expect(
-        cloudFirstAdapter2._metadata[id]?.modifiedAt.millisecondsSinceEpoch,
+        cloudFirstAdapter2.metadata[id]?.modifiedAt.millisecondsSinceEpoch,
         equals(timestamp.millisecondsSinceEpoch),
       );
-    });
-  });
-
-  group('SerializableSyncMetadata', () {
-    const testId = 'abc123';
-    final testDate = DateTime.parse('2024-04-10T12:00:00.000Z');
-    const testIsDeleted = true;
-
-    final testMetadata = SerializableSyncMetadata(
-      id: testId,
-      modifiedAt: testDate,
-      isDeleted: testIsDeleted,
-    );
-
-    test('toMap should return correct map', () {
-      final map = testMetadata.toMap();
-
-      expect(map, {
-        'id': testId,
-        'modifiedAt': testDate.toIso8601String(),
-        'isDeleted': testIsDeleted,
-      });
-    });
-
-    test('fromMap should return equivalent instance', () {
-      final map = {
-        'id': testId,
-        'modifiedAt': testDate.toIso8601String(),
-        'isDeleted': testIsDeleted,
-      };
-
-      final fromMap = SerializableSyncMetadata.fromMap(map);
-
-      expect(fromMap.id, testMetadata.id);
-      expect(fromMap.modifiedAt, testMetadata.modifiedAt);
-      expect(fromMap.isDeleted, testMetadata.isDeleted);
-    });
-
-    test('toJson should return valid JSON string', () {
-      final jsonStr = testMetadata.toJson();
-
-      final expectedJson = json.encode({
-        'id': testId,
-        'modifiedAt': testDate.toIso8601String(),
-        'isDeleted': testIsDeleted,
-      });
-
-      expect(jsonStr, expectedJson);
-    });
-
-    test('fromJson should return equivalent instance', () {
-      final jsonString = json.encode({
-        'id': testId,
-        'modifiedAt': testDate.toIso8601String(),
-        'isDeleted': testIsDeleted,
-      });
-
-      final fromJson = SerializableSyncMetadata.fromJson(jsonString);
-
-      expect(fromJson.id, testMetadata.id);
-      expect(fromJson.modifiedAt, testMetadata.modifiedAt);
-      expect(fromJson.isDeleted, testMetadata.isDeleted);
-    });
-  });
-
-  group('SerializableSyncAdapter Tests', () {
-    late SerializableSyncMetadataAdapter<SyncMetadata, MockData> adapter;
-
-    setUp(() {
-      adapter = MockSerializableSyncAdapter(
-        metadataToJson: (metadata) => json.encode({
-          'id': metadata.id,
-          'modifiedAt': metadata.modifiedAt.toIso8601String(),
-          'isDeleted': metadata.isDeleted,
-        }),
-        metadataFromJson: (jsonStr) {
-          final map = json.decode(jsonStr) as Map<String, dynamic>;
-          return SyncMetadata(
-            id: map['id'] as String,
-            modifiedAt: DateTime.parse(map['modifiedAt'] as String),
-            isDeleted: map['isDeleted'] as bool? ?? false,
-          );
-        },
-      );
-    });
-
-    test('metadataToJson serializes metadata correctly', () {
-      final metadata = SyncMetadata(
-        id: 'test-id',
-        modifiedAt: DateTime.parse('2024-04-10T12:00:00.000Z'),
-        isDeleted: true,
-      );
-
-      final jsonStr = adapter.metadataToJson(metadata);
-
-      expect(
-        jsonStr,
-        json.encode({
-          'id': 'test-id',
-          'modifiedAt': '2024-04-10T12:00:00.000Z',
-          'isDeleted': true,
-        }),
-      );
-    });
-
-    test('metadataFromJson deserializes metadata correctly', () {
-      final jsonStr = json.encode({
-        'id': 'test-id',
-        'modifiedAt': '2024-04-10T12:00:00.000Z',
-        'isDeleted': true,
-      });
-
-      final metadata = adapter.metadataFromJson(jsonStr);
-
-      expect(metadata.id, 'test-id');
-      expect(metadata.modifiedAt, DateTime.parse('2024-04-10T12:00:00.000Z'));
-      expect(metadata.isDeleted, true);
-    });
-
-    test('metadataFromJson handles missing isDeleted field gracefully', () {
-      final jsonStr = json.encode({
-        'id': 'test-id',
-        'modifiedAt': '2024-04-10T12:00:00.000Z',
-      });
-
-      final metadata = adapter.metadataFromJson(jsonStr);
-
-      expect(metadata.id, 'test-id');
-      expect(metadata.modifiedAt, DateTime.parse('2024-04-10T12:00:00.000Z'));
-      expect(metadata.isDeleted, false);
-    });
-
-    test('metadataToJson and metadataFromJson are inverses', () {
-      final originalMetadata = SyncMetadata(
-        id: 'test-id',
-        modifiedAt: DateTime.parse('2024-04-10T12:00:00.000Z'),
-        isDeleted: true,
-      );
-
-      final jsonStr = adapter.metadataToJson(originalMetadata);
-      final deserializedMetadata = adapter.metadataFromJson(jsonStr);
-
-      expect(deserializedMetadata.id, originalMetadata.id);
-      expect(deserializedMetadata.modifiedAt, originalMetadata.modifiedAt);
-      expect(deserializedMetadata.isDeleted, originalMetadata.isDeleted);
     });
   });
 }
@@ -1894,7 +1605,7 @@ void verifyStrategyStateOrder({
         // Only pass if there was nothing to download
         expect(stateTypes.contains(SavingToLocal), isFalse);
       }
-    case SyncStrategy.simultaneously:
+    case SyncStrategy.concurrently:
       // For simultaneous strategy, we can't verify order
       // Just verify that appropriate operations happened if needed
       expect(
