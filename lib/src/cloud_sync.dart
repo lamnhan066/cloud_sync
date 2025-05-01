@@ -273,11 +273,8 @@ class CloudSync<M, D> {
           await processUpload();
         case SyncStrategy.downloadOnly:
           await processDownload();
-        case SyncStrategy.simultaneously:
-          await Future.wait([
-            processDownload(),
-            processUpload(),
-          ]);
+        case SyncStrategy.concurrently:
+          await Future.wait([processDownload(), processUpload()]);
       }
 
       updateProgress(SyncCompleted.new);

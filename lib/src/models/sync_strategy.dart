@@ -12,6 +12,6 @@ enum SyncStrategy {
   /// Only downloads data without uploading.
   downloadOnly,
 
-  /// Performs both upload and download operations at the same time.
-  simultaneously,
+  /// Performs upload and download operations concurrently.
+  concurrently,
 }
