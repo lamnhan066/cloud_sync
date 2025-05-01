@@ -28,60 +28,27 @@ typedef SyncProgressCallback<M> = void Function(SyncState<M> state);
 /// This class facilitates the synchronization of data between local and cloud storage
 /// by comparing metadata and transferring missing or outdated data in both directions.
 class CloudSync<M, D> {
-  /// Creates a [CloudSync] instance.
-  ///
-  /// Requires functions for fetching, comparing, and saving data for both local and cloud storage.
-  CloudSync._({
-    required this.getLocalMetadataId,
-    required this.getCloudMetadataId,
-    required this.isLocalMetadataBeforeCloud,
-    required this.isCloudMetadataBeforeLocal,
-    required this.fetchLocalMetadataList,
-    required this.fetchCloudMetadataList,
-    required this.fetchLocalDetail,
-    required this.fetchCloudDetail,
-    required this.saveToLocal,
-    required this.saveToCloud,
-    this.shouldThrowOnError = false,
-    this.useConcurrentSync = false,
-  });
-
   /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
   ///
   /// This factory method simplifies the creation of a [CloudSync] instance
   /// by accepting adapters for both local and cloud storage. Each adapter
   /// encapsulates the necessary fetch, compare, and save functions required
   /// for synchronization.
-  ///
-  /// - [local]: The adapter for local storage.
-  /// - [cloud]: The adapter for cloud storage.
-  /// - [shouldThrowOnError]: If `true`, exceptions during synchronization will
-  ///   be thrown to the caller. If `false`, errors will be reported via
-  ///   [SyncProgressCallback] using the [SyncError] state, allowing the sync
-  ///   process to continue.
-  /// - [useConcurrentSync]: If `true`, synchronization will occur concurrently
-  ///   between local and cloud storage. Defaults to `false`.
-  factory CloudSync.fromAdapters({
+  CloudSync.fromAdapters({
     required SyncAdapter<M, D> local,
     required SyncAdapter<M, D> cloud,
-    bool shouldThrowOnError = false,
-    bool useConcurrentSync = false,
-  }) {
-    return CloudSync<M, D>._(
-      getLocalMetadataId: local.getMetadataId,
-      getCloudMetadataId: cloud.getMetadataId,
-      isLocalMetadataBeforeCloud: local.isCurrentMetadataBeforeOther,
-      isCloudMetadataBeforeLocal: cloud.isCurrentMetadataBeforeOther,
-      fetchLocalMetadataList: local.fetchMetadataList,
-      fetchCloudMetadataList: cloud.fetchMetadataList,
-      fetchLocalDetail: local.fetchDetail,
-      fetchCloudDetail: cloud.fetchDetail,
-      saveToLocal: local.save,
-      saveToCloud: cloud.save,
-      shouldThrowOnError: shouldThrowOnError,
-      useConcurrentSync: useConcurrentSync,
-    );
-  }
+    this.shouldThrowOnError = false,
+    this.useConcurrentSync = false,
+  })  : getLocalMetadataId = local.getMetadataId,
+        getCloudMetadataId = cloud.getMetadataId,
+        isLocalMetadataBeforeCloud = local.isCurrentMetadataBeforeOther,
+        isCloudMetadataBeforeLocal = cloud.isCurrentMetadataBeforeOther,
+        fetchLocalMetadataList = local.fetchMetadataList,
+        fetchCloudMetadataList = cloud.fetchMetadataList,
+        fetchLocalDetail = local.fetchDetail,
+        fetchCloudDetail = cloud.fetchDetail,
+        saveToLocal = local.save,
+        saveToCloud = cloud.save;
 
   /// Function to get the unique identifier for local metadata.
   final GetMetadataId<M> getLocalMetadataId;
