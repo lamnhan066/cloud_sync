@@ -43,24 +43,29 @@ class CloudSync<M, D> {
     required this.saveToLocal,
     required this.saveToCloud,
     this.shouldThrowOnError = false,
+    this.useConcurrentSync = false,
   });
 
   /// Creates a [CloudSync] instance using the provided [SyncAdapter]s.
   ///
   /// This factory method simplifies the creation of a [CloudSync] instance
   /// by accepting adapters for both local and cloud storage. Each adapter
-  /// provides the required fetch and save functions needed for synchronization.
+  /// encapsulates the necessary fetch, compare, and save functions required
+  /// for synchronization.
   ///
   /// - [local]: The adapter for local storage.
   /// - [cloud]: The adapter for cloud storage.
   /// - [shouldThrowOnError]: If `true`, exceptions during synchronization will
   ///   be thrown to the caller. If `false`, errors will be reported via
-  ///   [SyncProgressCallback] using the [SyncError] state and the sync process
-  ///   will continue.
+  ///   [SyncProgressCallback] using the [SyncError] state, allowing the sync
+  ///   process to continue.
+  /// - [useConcurrentSync]: If `true`, synchronization will occur concurrently
+  ///   between local and cloud storage. Defaults to `false`.
   factory CloudSync.fromAdapters({
     required SyncAdapter<M, D> local,
     required SyncAdapter<M, D> cloud,
     bool shouldThrowOnError = false,
+    bool useConcurrentSync = false,
   }) {
     return CloudSync<M, D>._(
       getLocalMetadataId: local.getMetadataId,
@@ -74,6 +79,7 @@ class CloudSync<M, D> {
       saveToLocal: local.save,
       saveToCloud: cloud.save,
       shouldThrowOnError: shouldThrowOnError,
+      useConcurrentSync: useConcurrentSync,
     );
   }
 
@@ -115,6 +121,13 @@ class CloudSync<M, D> {
   /// using the [SyncError] state, allowing the synchronization process to proceed
   /// despite the errors.
   final bool shouldThrowOnError;
+
+  /// Determines whether the synchronization process should run concurrently.
+  ///
+  /// When set to `true`, the synchronization of local and cloud storage
+  /// will occur simultaneously. If `false`, the synchronization will
+  /// proceed sequentially, one direction at a time.
+  final bool useConcurrentSync;
 
   /// Indicates whether a synchronization process is currently in progress.
   bool _isSyncInProgress = false;
@@ -176,13 +189,7 @@ class CloudSync<M, D> {
   /// receives a [SyncState] representing the current synchronization state.
   /// In case of an error during synchronization, the error is reported using the
   /// [SyncError] state (if the callback is provided) or rethrown to the caller.
-  ///
-  /// If [useConcurrentSync] is set to `true`, the synchronization of local and cloud storage
-  /// will run concurrently. Otherwise, they will be processed sequentially.
-  Future<void> sync({
-    SyncProgressCallback<M>? progress,
-    bool useConcurrentSync = false,
-  }) async {
+  Future<void> sync({SyncProgressCallback<M>? progress}) async {
     if (_isDisposed) {
       throw SyncDisposedError.withMethodName('sync()');
     }

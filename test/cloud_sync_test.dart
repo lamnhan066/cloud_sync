@@ -649,10 +649,13 @@ void main() {
       final cloudData = MockData('Cloud Concurrent Data');
       await cloudAdapter.save(cloudMetadata, cloudData);
 
-      await cloudSync.sync(
-        progress: progressCallback,
+      cloudSync = CloudSync.fromAdapters(
+        local: localAdapter,
+        cloud: cloudAdapter,
         useConcurrentSync: true,
       );
+
+      await cloudSync.sync(progress: progressCallback);
 
       // Check proper data exchange
       expect(cloudAdapter._data['9'], equals(localData));
