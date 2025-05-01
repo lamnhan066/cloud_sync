@@ -42,40 +42,52 @@ class ScanningLocal extends SyncState {
 
 /// Indicates that data is being saved to the cloud.
 /// Carries metadata about the item being uploaded.
-class SavingToCloud<M> extends SyncState {
+class SavingToCloud extends SyncState {
   /// Creates a [SavingToCloud] state with the given [metadata].
-  const SavingToCloud(this.metadata);
+  const SavingToCloud(this._metadata);
 
-  /// Metadata for the item being saved to the cloud.
-  final M metadata;
+  /// Metadata for the item that was saved to the cloud.
+  T metadata<T>() => _metadata as T;
+
+  /// Metadata for the item that was saved to the cloud.
+  final dynamic _metadata;
 }
 
 /// Indicates that data was successfully saved to the cloud.
-class SavedToCloud<M> extends SyncState {
+class SavedToCloud extends SyncState {
   /// Creates a [SavedToCloud] state with the given [metadata].
-  const SavedToCloud(this.metadata);
+  const SavedToCloud(this._metadata);
 
   /// Metadata for the item that was saved to the cloud.
-  final M metadata;
+  T metadata<T>() => _metadata as T;
+
+  /// Metadata for the item that was saved to the cloud.
+  final dynamic _metadata;
 }
 
 /// Indicates that data is being saved to local storage.
 /// Carries metadata about the item being stored.
-class SavingToLocal<M> extends SyncState {
+class SavingToLocal extends SyncState {
   /// Creates a [SavingToLocal] state with the given [metadata].
-  const SavingToLocal(this.metadata);
+  const SavingToLocal(this._metadata);
 
-  /// Metadata for the item being saved locally.
-  final M metadata;
+  /// Metadata for the item that was saved locally.
+  T metadata<T>() => _metadata as T;
+
+  /// Metadata for the item that was saved locally.
+  final dynamic _metadata;
 }
 
 /// Indicates that data was successfully saved to local storage.
-class SavedToLocal<M> extends SyncState {
+class SavedToLocal extends SyncState {
   /// Creates a [SavedToLocal] state with the given [metadata].
-  const SavedToLocal(this.metadata);
+  const SavedToLocal(this._metadata);
 
   /// Metadata for the item that was saved locally.
-  final M metadata;
+  T metadata<T>() => _metadata as T;
+
+  /// Metadata for the item that was saved locally.
+  final dynamic _metadata;
 }
 
 /// Indicates that synchronization completed successfully.
