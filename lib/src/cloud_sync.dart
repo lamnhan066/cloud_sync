@@ -22,7 +22,7 @@ typedef FetchDetail<M, D> = FutureOr<D> Function(M metadata);
 typedef SaveDetail<M, D> = FutureOr<void> Function(M metadata, D detail);
 
 /// A function type that reports synchronization progress via a [SyncState].
-typedef SyncProgressCallback<M> = void Function(SyncState state);
+typedef SyncProgressCallback = void Function(SyncState state);
 
 /// Handles synchronization between local and cloud storage.
 ///
@@ -115,7 +115,7 @@ class CloudSync<M, D> {
   /// If a sync is already in progress when the timer fires, that cycle is skipped.
   void autoSync({
     required Duration interval,
-    SyncProgressCallback<M>? progress,
+    SyncProgressCallback? progress,
   }) {
     if (_isDisposed) {
       throw SyncDisposedError.withMethodName('autoSync()');
@@ -153,7 +153,7 @@ class CloudSync<M, D> {
   /// receives a [SyncState] representing the current synchronization state.
   /// In case of an error during synchronization, the error is reported using the
   /// [SyncError] state (if the callback is provided) or rethrown to the caller.
-  Future<void> sync({SyncProgressCallback<M>? progress}) async {
+  Future<void> sync({SyncProgressCallback? progress}) async {
     if (_isDisposed) {
       throw SyncDisposedError.withMethodName('sync()');
     }
