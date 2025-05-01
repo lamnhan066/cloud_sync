@@ -22,7 +22,7 @@ typedef FetchDetail<M, D> = FutureOr<D> Function(M metadata);
 typedef SaveDetail<M, D> = FutureOr<void> Function(M metadata, D detail);
 
 /// A function type that reports synchronization progress via a [SyncState].
-typedef SyncProgressCallback<M> = void Function(SyncState<M> state);
+typedef SyncProgressCallback<M> = void Function(SyncState state);
 
 /// Handles synchronization between local and cloud storage.
 ///
@@ -159,7 +159,7 @@ class CloudSync<M, D> {
     }
 
     // Helper function to report progress if a callback is provided.
-    bool updateProgress(SyncState<M> Function() state) {
+    bool updateProgress(SyncState Function() state) {
       if (progress != null) {
         progress(state());
         return true;

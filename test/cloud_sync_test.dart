@@ -152,7 +152,7 @@ void main() {
     late MockSyncAdapter localAdapter;
     late MockSyncAdapter cloudAdapter;
     late CloudSync<SyncMetadata, MockData> cloudSync;
-    final progressStates = <SyncState<SyncMetadata>>[];
+    final progressStates = <SyncState>[];
 
     setUp(() {
       localAdapter = MockSyncAdapter();
@@ -168,7 +168,7 @@ void main() {
       progressStates.clear();
     });
 
-    void progressCallback(SyncState<SyncMetadata> state) {
+    void progressCallback(SyncState state) {
       progressStates.add(state);
     }
 
@@ -177,11 +177,11 @@ void main() {
 
       // Verify expected state sequence
       expect(progressStates, [
-        isA<FetchingLocalMetadata<SyncMetadata>>(),
-        isA<FetchingCloudMetadata<SyncMetadata>>(),
-        isA<ScanningCloud<SyncMetadata>>(),
-        isA<ScanningLocal<SyncMetadata>>(),
-        isA<SyncCompleted<SyncMetadata>>(),
+        isA<FetchingLocalMetadata>(),
+        isA<FetchingCloudMetadata>(),
+        isA<ScanningCloud>(),
+        isA<ScanningLocal>(),
+        isA<SyncCompleted>(),
       ]);
 
       expect(localAdapter.fetchMetadataCallCount, 1);
@@ -203,13 +203,13 @@ void main() {
       expect(
         progressStates,
         containsAllInOrder([
-          isA<FetchingLocalMetadata<SyncMetadata>>(),
-          isA<FetchingCloudMetadata<SyncMetadata>>(),
-          isA<ScanningCloud<SyncMetadata>>(),
-          isA<ScanningLocal<SyncMetadata>>(),
+          isA<FetchingLocalMetadata>(),
+          isA<FetchingCloudMetadata>(),
+          isA<ScanningCloud>(),
+          isA<ScanningLocal>(),
           isA<SavingToCloud<SyncMetadata>>(),
           isA<SavedToCloud<SyncMetadata>>(),
-          isA<SyncCompleted<SyncMetadata>>(),
+          isA<SyncCompleted>(),
         ]),
       );
 
@@ -232,13 +232,13 @@ void main() {
       expect(
         progressStates,
         containsAllInOrder([
-          isA<FetchingLocalMetadata<SyncMetadata>>(),
-          isA<FetchingCloudMetadata<SyncMetadata>>(),
-          isA<ScanningCloud<SyncMetadata>>(),
+          isA<FetchingLocalMetadata>(),
+          isA<FetchingCloudMetadata>(),
+          isA<ScanningCloud>(),
           isA<SavingToLocal<SyncMetadata>>(),
           isA<SavedToLocal<SyncMetadata>>(),
-          isA<ScanningLocal<SyncMetadata>>(),
-          isA<SyncCompleted<SyncMetadata>>(),
+          isA<ScanningLocal>(),
+          isA<SyncCompleted>(),
         ]),
       );
 
@@ -406,9 +406,9 @@ void main() {
       localAdapter.throwErrorOnFetchMetadata = true;
       await cloudSync.sync(progress: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
-      final errorState = progressStates.lastWhere((state) => state is SyncError)
-          as SyncError<SyncMetadata>;
+      expect(progressStates, contains(isA<SyncError>()));
+      final errorState =
+          progressStates.lastWhere((state) => state is SyncError) as SyncError;
       expect(errorState.error.toString(), contains('Fetch Metadata Error'));
       expect(errorState.stackTrace, isNotNull);
       // More specific error verification:
@@ -419,10 +419,10 @@ void main() {
       cloudAdapter.throwErrorOnFetchMetadata = true;
       await cloudSync.sync(progress: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
+      expect(progressStates, contains(isA<SyncError>()));
       // More specific error verification:
-      final errorState = progressStates.lastWhere((state) => state is SyncError)
-          as SyncError<SyncMetadata>;
+      final errorState =
+          progressStates.lastWhere((state) => state is SyncError) as SyncError;
       expect(errorState.error, isA<Exception>());
     });
 
@@ -434,7 +434,7 @@ void main() {
       );
       await cloudSync.sync(progress: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
+      expect(progressStates, contains(isA<SyncError>()));
       // More specific error verification:
       final errorState =
           progressStates.lastWhere((state) => state is SyncError) as SyncError;
@@ -449,10 +449,10 @@ void main() {
       );
       await cloudSync.sync(progress: progressCallback);
 
-      expect(progressStates, contains(isA<SyncError<SyncMetadata>>()));
+      expect(progressStates, contains(isA<SyncError>()));
       // More specific error verification:
-      final errorState = progressStates.lastWhere((state) => state is SyncError)
-          as SyncError<SyncMetadata>;
+      final errorState =
+          progressStates.lastWhere((state) => state is SyncError) as SyncError;
       expect(errorState.error, isA<Exception>());
     });
 
@@ -468,7 +468,7 @@ void main() {
       expect(progressStates.any((state) => state is SavingToLocal), isTrue);
 
       // Check for continuous sync even after error
-      expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
+      expect(progressStates.last, isA<SyncCompleted>());
     });
 
     test('Sync handles error on save to cloud', () async {
@@ -483,7 +483,7 @@ void main() {
       expect(progressStates.any((state) => state is SavingToCloud), isTrue);
 
       // Check for continuous sync even after error
-      expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
+      expect(progressStates.last, isA<SyncCompleted>());
     });
 
     test('Auto sync calls sync at least once within given timeframe', () async {
@@ -663,17 +663,17 @@ void main() {
 
       // Verify expected progress states for concurrent sync
       expect(
-        progressStates.whereType<FetchingLocalMetadata<SyncMetadata>>().length,
+        progressStates.whereType<FetchingLocalMetadata>().length,
         1,
         reason: 'Should have exactly one FetchingLocalMetadata state',
       );
       expect(
-        progressStates.whereType<FetchingCloudMetadata<SyncMetadata>>().length,
+        progressStates.whereType<FetchingCloudMetadata>().length,
         1,
         reason: 'Should have exactly one FetchingCloudMetadata state',
       );
       expect(
-        progressStates.whereType<SyncCompleted<SyncMetadata>>().length,
+        progressStates.whereType<SyncCompleted>().length,
         1,
         reason: 'Should have exactly one SyncCompleted state',
       );
@@ -687,7 +687,7 @@ void main() {
       await cloudSync.sync(progress: progressCallback);
 
       // Should complete successfully with no errors
-      expect(progressStates.last, isA<SyncCompleted<SyncMetadata>>());
+      expect(progressStates.last, isA<SyncCompleted>());
     });
 
     test('Sync with same timestamp keeps both versions when different',
