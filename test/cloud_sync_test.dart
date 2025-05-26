@@ -1551,8 +1551,6 @@ void main() {
   });
 }
 
-// Add this helper function inside the test file to verify state transitions
-
 /// Helper to verify state transitions match the expected strategy.
 void verifyStrategyStateOrder({
   required List<SyncState> states,
